@@ -1,0 +1,232 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using UnityEngine;
+
+// 1. THE DATA CONTAINER
+// This class defines EXACTLY what gets written to the JSON file.
+// Add variables here to expand what you want to save in the future.
+[Serializable]
+public class SaveData
+{
+    [Header("Session Metadata")]
+    public string saveName;         // e.g., "Session_01"
+    public string lastPlayedTime;   // To show "Last played: 2 mins ago"
+    public string sceneName;        // To load the correct Unity Scene
+
+    [Header("Game Progression")]
+    public string currentMission;
+    public string currentObjective;
+
+    [Header("Character State")]
+    public Vector3 playerPosition;
+    public Quaternion playerRotation;
+
+    // Distinct location the character 'remembers' (Narrative Checkpoint)
+    public string rememberedLocationName;
+
+    public int saveSlotIndex;
+    public float completionPercentage;
+
+    [Header("World State Data")]
+    public List<string> completedSubObjectives = new List<string>();
+    public List<string> triggeredTrapIDs = new List<string>();
+    public List<string> deadEnemyIDs = new List<string>();
+
+    public List<string> unlockedTerminalIDs = new List<string>();
+}
+
+
+namespace OutGame
+{
+    // 2. THE CONTROLLER
+    public class OutSaveController : MonoBehaviour
+    {
+        // Singleton pattern for easy access from anywhere (e.g., OutSaveController.Instance.SaveGame())
+        public static OutSaveController Instance { get; private set; }
+
+        [Header("Settings")]
+        [SerializeField] private string folderPath = "OutGame/SIAV/SavedSessions";
+        [SerializeField] private string defaultFileName = "quick_save.json";
+        [SerializeField] private bool noParentAllowed = false;
+
+        public bool HasSaveFile(int slotIndex)
+        {
+            string filePath = GetFilePathForSlot(slotIndex);
+            return File.Exists(filePath);
+        }
+
+        private void Awake()
+        {
+            if (Instance == null)
+            {
+                Instance = this;
+                if (noParentAllowed) transform.parent = null;
+            }
+            else Destroy(gameObject);
+        }
+
+        /// <summary>
+        /// Collects data and writes it to the JSON file.
+        /// </summary>
+        /// <param name="mission">Current active mission ID or Name</param>
+        /// <param name="objective">Current active objective text</param>
+        /// <param name="playerParams">The player's Transform</param>
+        /// <param name="locationMemory">The narrative name of the current location (e.g., "The Red Hallway")</param>
+        public void SaveGame(string mission, string objective, Transform playerParams, string locationMemory)
+        {
+            // A. Prepare the Data
+            SaveData data = new SaveData
+            {
+                // Metadata
+                saveName = "AutoSave",
+                lastPlayedTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                sceneName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name,
+
+                // Mission Info
+                currentMission = mission,
+                currentObjective = objective,
+
+                // Position & Rotation
+                playerPosition = playerParams.position,
+                playerRotation = playerParams.rotation,
+                rememberedLocationName = locationMemory
+            };
+
+            var allSaveables = FindObjectsByType<MonoBehaviour>().OfType<ISaveable>();
+            foreach (var saveable in allSaveables)
+            {
+                saveable.PopulateSaveData(data);
+            }
+
+            // B. Serialize to JSON
+            // prettyPrint = true makes the file human-readable in Notepad
+            string json = JsonUtility.ToJson(data, true);
+
+            // C. Write to File
+            try
+            {
+                string fullPath = GetSaveFolderPath();
+
+                // Ensure directory exists
+                if (!Directory.Exists(fullPath))
+                {
+                    Directory.CreateDirectory(fullPath);
+                }
+
+                string filePath = Path.Combine(fullPath, defaultFileName);
+                File.WriteAllText(filePath, json);
+
+                OutLogger.Log($"<color=green>[OutSaveController]</color> Game saved successfully at: {filePath}");
+            }
+            catch (Exception e)
+            {
+                OutLogger.LogError($"[OutSaveController] Failed to save game: {e.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Loads the data from JSON and returns the SaveData object.
+        /// You can then use this object to set the player's position, etc.
+        /// </summary>
+        public SaveData LoadGame()
+        {
+            string filePath = Path.Combine(GetSaveFolderPath(), defaultFileName);
+
+            if (File.Exists(filePath))
+            {
+                try
+                {
+                    string json = File.ReadAllText(filePath);
+                    SaveData data = JsonUtility.FromJson<SaveData>(json);
+                    OutLogger.Log($"<color=cyan>[OutSaveController]</color> Game loaded: {data.lastPlayedTime}");
+                    return data;
+                }
+                catch (Exception e)
+                {
+                    OutLogger.LogError($"[OutSaveController] Save file corrupted: {e.Message}");
+                    return null;
+                }
+            }
+            else
+            {
+                OutLogger.LogWarning("[OutSaveController] No save file found.");
+                return null;
+            }
+        }
+
+        public SaveData LoadGame(int slotIndex)
+        {
+            string filePath = GetFilePathForSlot(slotIndex);
+            if (File.Exists(filePath))
+            {
+                string json = File.ReadAllText(filePath);
+                return JsonUtility.FromJson<SaveData>(json);
+            }
+            return null;
+        }
+
+        public void DeleteSave(int slotIndex)
+        {
+            string filePath = GetFilePathForSlot(slotIndex);
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+                OutLogger.Log($"<color=red>[OutSaveController]</color> Deleted save slot: {slotIndex}");
+            }
+        }
+
+        // Helper to get the correct documents path
+        private string GetSaveFolderPath()
+        {
+            string docPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            return Path.Combine(docPath, folderPath);
+        }
+        // Helper to generate unique filenames per slot
+        private string GetFilePathForSlot(int index)
+        {
+            string fullPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), folderPath);
+            return Path.Combine(fullPath, $"save_{index}.json");
+        }
+
+        public SaveData GetLatestSaveData(out string latestFilePath)
+        {
+            latestFilePath = string.Empty;
+            string fullPath = GetSaveFolderPath();
+
+            if (!Directory.Exists(fullPath)) return null;
+
+            string[] saveFiles = Directory.GetFiles(fullPath, "*.json");
+            if (saveFiles.Length == 0) return null;
+
+            SaveData newestData = null;
+            DateTime newestTime = DateTime.MinValue;
+
+            foreach (string file in saveFiles)
+            {
+                try
+                {
+                    string json = File.ReadAllText(file);
+                    SaveData data = JsonUtility.FromJson<SaveData>(json);
+
+                    if (data != null && DateTime.TryParseExact(data.lastPlayedTime, "yyyy-MM-dd HH:mm:ss", null, System.Globalization.DateTimeStyles.None, out DateTime saveTime))
+                    {
+                        if (saveTime > newestTime)
+                        {
+                            newestTime = saveTime;
+                            newestData = data;
+                            latestFilePath = file;
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    OutLogger.LogWarning($"[OutSaveController] Skipped unreadable save file during latest check: {e.Message}");
+                }
+            }
+
+            return newestData;
+        }
+    }
+}
