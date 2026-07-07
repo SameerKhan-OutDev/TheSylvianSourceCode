@@ -39,7 +39,10 @@ namespace OutGame
         public delegate void OnSceneLoadingStart(string sceneName);
         public delegate void OnSceneLoadingComplete(string sceneName);
 
+
         public delegate void StartGame();
+
+        public delegate void OnPlayerFailed(string reason);
 
         #endregion
 
@@ -48,6 +51,8 @@ namespace OutGame
         public event OnStateChange StateChanged;
         public event OnSceneLoadingStart SceneLoadingStarted;
         public event OnSceneLoadingComplete SceneLoadingCompleted;
+
+        public event OnPlayerFailed SylvianFailed;
 
         #endregion
 
@@ -191,6 +196,17 @@ namespace OutGame
                 OutLogger.LogError($"[OutGameManager] FATAL CRASH during ContinueGame: {ex.Message}\n{ex.StackTrace}");
                 return false; // Still return false so your UI Panel opens!
             }
+        }
+
+        public void TriggerSylvianFailed(string failureReason)
+        {
+            OutLogger.Log($"<color=red>[OutGameManager]</color> Sylvian Failed! Reason: {failureReason}");
+
+            // Optional: Change game state to freeze background elements or pause
+            ChangeState(OutGameState.Paused);
+
+            // Broadcast the failure to any listeners (like a Game Over UI Panel)
+            SylvianFailed?.Invoke(failureReason);
         }
 
         public void RestartCurrentLevel()

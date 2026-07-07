@@ -96,6 +96,7 @@ public class OutInputManager : MonoBehaviour
             inputActions.UI.Enable();
             ToggleCursorState(true);  // Free cursor for UI interactions
         }
+        OutLogger.Log($"Set Gameplay Input: {enabled}");
     }
     #endregion
 }

@@ -34,6 +34,11 @@ namespace OutGame
         [SerializeField] private Vector2 sprintBias = new Vector2(6f, 6f);
         [SerializeField] private float favourMultiplier = 0.6f;
 
+        [Space]
+
+        [SerializeField] private float m_pushPower = 2.0f;
+        [SerializeField] private float m_weightLimit = 50f;
+
         [Header("Jump Settings & Exploits")]
         [Tooltip("Layers considered solid obstacles that should block a jump.")]
         [SerializeField] private LayerMask m_jumpObstacleLayer = 1; // Default to 1 (Default layer)
@@ -113,6 +118,30 @@ namespace OutGame
                 return;
 
             HandleLocomotionInput();
+
+            Vector2 rawInput = OutInputManager.Instance.InputActions.Player.Move.ReadValue<Vector2>();
+            m_trajectoryGenerator.InputVector = new Vector3(rawInput.x, 0f, rawInput.y);
+        }
+
+        /// <summary>
+        /// Fires continuously while the CharacterController intersects with another collider during its Move() cycle.
+        /// </summary>
+        private void OnControllerColliderHit(ControllerColliderHit hit)
+        {
+            Rigidbody rb = hit.collider.attachedRigidbody;
+
+            if (rb == null || rb.isKinematic)
+                return;
+
+            if (rb.mass > m_weightLimit)
+                return;
+
+            if (hit.moveDirection.y < -0.3f)
+                return;
+
+            Vector3 pushDir = new Vector3(hit.moveDirection.x, 0f, hit.moveDirection.z);
+
+            rb.AddForceAtPosition(pushDir * m_pushPower, hit.point, ForceMode.Impulse);
         }
 
         private void OnDestroy()

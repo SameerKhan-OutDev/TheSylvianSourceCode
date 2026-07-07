@@ -129,6 +129,11 @@ namespace OutGame
                 gameplayUI.gameplayHintsPanel.HideHint();
             }
         }
+
+        internal void ShowFailurePanel(string reason)
+        {
+
+        }
         #endregion
     }
 }

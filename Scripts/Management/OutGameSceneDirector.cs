@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Transactions;
-using TimeGhost;
 using UnityEngine;
 using UnityEngine.Video;
 
@@ -42,6 +41,7 @@ namespace OutGame
             if (OutGameManager.Instance != null)
             {
                 OutGameManager.Instance.StateChanged += OnGameStateChanged;
+                OutGameManager.Instance.SylvianFailed += OnSylvianFailed;
             }
             else OutLogger.LogError("Game Manager Instance doesn't exist, skipping Game State Change.");
         }
@@ -50,6 +50,7 @@ namespace OutGame
             if (OutGameManager.Instance != null)
             {
                 OutGameManager.Instance.StateChanged -= OnGameStateChanged;
+                OutGameManager.Instance.SylvianFailed -= OnSylvianFailed;
             }
             else OutLogger.LogError("Game Manager Instance doesn't exist, skipping Game State Change.");
         }
@@ -264,5 +265,15 @@ namespace OutGame
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
         }
+
+
+        public void OnSylvianFailed(string reason)
+        {
+            OutLogger.Log($"<color=red>[Gameplay]</color> Sylvian failed: {reason}");
+            PauseGame();
+            OutUIManager.Instance?.ShowFailurePanel(reason);
+        }
+
+        // methods indent
     }
 }
