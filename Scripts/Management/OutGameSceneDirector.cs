@@ -1,11 +1,11 @@
-using NUnit.Framework;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Transactions;
 using UnityEngine;
-using UnityEngine.Video;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.HighDefinition;
+using DG.Tweening;
+using Random = UnityEngine.Random;
 
 namespace OutGame
 {
@@ -23,8 +23,16 @@ namespace OutGame
         [Header("Narrative Sequences")]
         [SerializeField] private OutCinematicData openingPrologue;
 
+        [Header("Post Processing")]
+        [Tooltip("Assign the Global Volume containing ColorAdjustments, SMH, and Bloom overrides.")]
+        [SerializeField] private Volume m_globalVolume;
 
         public static OutGameSceneDirector Instance { get; private set; }
+
+        private ColorAdjustments m_colorAdjustments;
+        private ShadowsMidtonesHighlights m_smh;
+        private Bloom m_bloom;
+        private Tween m_timeTween;
 
         private void Awake()
         {
@@ -34,6 +42,14 @@ namespace OutGame
                 return;
             }
             Instance = this;
+
+            // Cache HDRP Post-Processing Overrides
+            if (m_globalVolume != null && m_globalVolume.profile != null)
+            {
+                m_globalVolume.profile.TryGet(out m_colorAdjustments);
+                m_globalVolume.profile.TryGet(out m_smh);
+                m_globalVolume.profile.TryGet(out m_bloom);
+            }
         }
 
         private void OnEnable()
@@ -45,6 +61,7 @@ namespace OutGame
             }
             else OutLogger.LogError("Game Manager Instance doesn't exist, skipping Game State Change.");
         }
+
         private void OnDisable()
         {
             if (OutGameManager.Instance != null)
@@ -52,25 +69,19 @@ namespace OutGame
                 OutGameManager.Instance.StateChanged -= OnGameStateChanged;
                 OutGameManager.Instance.SylvianFailed -= OnSylvianFailed;
             }
-            else OutLogger.LogError("Game Manager Instance doesn't exist, skipping Game State Change.");
+
+            m_timeTween?.Kill(); // Prevent memory leaks
         }
+
         private void OnDestroy()
         {
             Instance = null;
-            if (OutGameManager.Instance != null)
-            {
-                OutGameManager.Instance.StateChanged -= OnGameStateChanged;
-            }
-            else OutLogger.LogError("Game Manager Instance doesn't exist, skipping Game State Change.");
         }
 
         private void Start()
         {
-            // Ensure UI and Time are reset
             Time.timeScale = 1f;
             OutUIManager.Instance?.EnableGameplayUI();
-
-            // Fire and forget the asynchronous initialization
             _ = InitializeGameSessionAsync();
         }
 
@@ -85,16 +96,12 @@ namespace OutGame
                     PauseGame();
                     break;
                 case OutGameState.Cinematic:
-                    // Handle cinematic state if needed
-                    break;
-                default:
                     break;
             }
         }
 
         private async Awaitable InitializeGameSessionAsync()
         {
-            // Fallback for testing directly in the Editor without Main Menu
             bool isNewGame = OutGameManager.Instance == null || OutGameManager.Instance.IsNewGameSession;
 
             if (isNewGame)
@@ -111,7 +118,6 @@ namespace OutGame
         {
             OutLogger.Log("<color=cyan>[Gameplay]</color> Initializing Fresh Game.");
 
-            // 1. Place player at start
             if (playerTransform != null && defaultSpawnPoint != null)
             {
                 playerTransform.position = defaultSpawnPoint.position;
@@ -126,7 +132,6 @@ namespace OutGame
                 }
                 GameplayElements.SetActive(false);
 
-                // 2. Lock state and trigger Cinematic
                 if (openingPrologue != null && OutCinematicManager.Instance != null)
                 {
                     OutGameManager.Instance.ChangeState(OutGameState.Cinematic);
@@ -136,7 +141,6 @@ namespace OutGame
                 }
             }
 
-            // 3. Smooth transition to gameplay
             await ResumeGameplayWithTransitionAsync();
         }
 
@@ -147,14 +151,12 @@ namespace OutGame
 
             if (data != null)
             {
-                // 1. Restore Player
                 if (playerTransform != null)
                 {
                     playerTransform.position = data.playerPosition;
                     playerTransform.rotation = data.playerRotation;
                 }
 
-                // 2. Restore World State
                 var allSaveables = FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None).OfType<ISaveable>();
                 foreach (var saveable in allSaveables)
                 {
@@ -174,44 +176,35 @@ namespace OutGame
                 playerTransform.position = playerPos.position;
                 playerTransform.rotation = playerPos.rotation;
             }
-            else Debug.Log("Started cutscene, but skipped positioning the player becaues either player itsef or player position was not given.");
+            else Debug.Log("Started cutscene, but skipped positioning the player because either player itself or player position was not given.");
 
-            // Lock the state BEFORE the cutscene plays
             OutGameManager.Instance?.ChangeState(OutGameState.Cinematic);
             OutInputManager.Instance.SetGameplayInput(false);
 
             if (environment.Count > 0)
             {
-                foreach (var env in environment)
-                {
-                    env.SetActive(false);
-                }
+                foreach (var env in environment) env.SetActive(false);
             }
             GameplayElements.SetActive(false);
 
-            // Play the Cutscene
             if (cutsceneAsset != null && OutCinematicManager.Instance != null)
             {
                 await OutCinematicManager.Instance.PlayCinematicAsync(cutsceneAsset);
             }
 
-            // 3. Smooth transition back to gameplay
             await ResumeGameplayWithTransitionAsync();
         }
 
         private async Awaitable ResumeGameplayWithTransitionAsync()
         {
-            // Drop curtain if UI manager exists
             if (OutUIManager.Instance != null)
             {
                 OutUIManager.Instance.ShowFadePanel();
-                await Awaitable.WaitForSecondsAsync(0.5f); // Wait for DOTween to cover the screen
+                await Awaitable.WaitForSecondsAsync(0.5f);
             }
 
-            // Setup environment & player control behind the scenes
             StartGameplay();
 
-            // Lift curtain
             if (OutUIManager.Instance != null)
             {
                 _ = OutUIManager.Instance.HideFadePanelAsync(0.5f);
@@ -223,57 +216,106 @@ namespace OutGame
             if (OutGameManager.Instance != null && OutGameManager.Instance.currentState == OutGameState.Gameplay) return;
             OutLogger.Log("<color=green>[Gameplay]</color> Player now has control.");
 
-
             OutInputManager.Instance.SetGameplayInput(true);
-
             Cinematics.SetActive(false);
+
             if (environment.Count > 0)
             {
-                foreach (var env in environment)
-                {
-                    env.SetActive(true);
-                }
+                foreach (var env in environment) env.SetActive(true);
             }
             GameplayElements.SetActive(true);
 
-
-            if (OutGameManager.Instance != null && OutGameManager.Instance.currentState != OutGameState.Gameplay)
+            if (OutGameManager.Instance != null)
             {
                 OutGameManager.Instance?.ChangeState(OutGameState.Gameplay);
-
-                OutLogger.Log("Game state changed to Gameplay.");
             }
+
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
 
-            // TODO: Start ambient audio via OutSoundManager
+            // Transition Time & Visuals back to normal
+            float transitionTime = Random.Range(0.2f, 0.5f);
+
+            m_timeTween?.Kill();
+            m_timeTween = DOTween.To(() => Time.timeScale, x =>
+            {
+                Time.timeScale = x;
+                Time.fixedDeltaTime = 0.02f * x; // Adjust physics step to avoid stuttering
+            }, 1f, transitionTime).SetUpdate(true).SetEase(Ease.InOutSine);
+
+            if (m_colorAdjustments != null)
+            {
+                DOTween.To(() => m_colorAdjustments.saturation.value, x => m_colorAdjustments.saturation.value = x, 0f, transitionTime).SetUpdate(true);
+            }
         }
 
         public void PauseGame()
         {
             if (OutGameManager.Instance != null && OutGameManager.Instance.currentState == OutGameState.Paused) return;
+
             OutInputManager.Instance.SetGameplayInput(false);
             Cinematics.SetActive(false);
-
             GameplayElements.SetActive(true);
 
-            if (OutGameManager.Instance != null && OutGameManager.Instance.currentState != OutGameState.Paused)
+            if (OutGameManager.Instance != null)
             {
                 OutGameManager.Instance?.ChangeState(OutGameState.Paused);
-                OutLogger.Log("Game state changed to Paused.");
             }
+
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
-        }
 
+            // Transition Time to 0 and screen to Greyscale
+            float transitionTime = Random.Range(0.2f, 0.5f);
+
+            m_timeTween?.Kill();
+            m_timeTween = DOTween.To(() => Time.timeScale, x =>
+            {
+                Time.timeScale = x;
+                Time.fixedDeltaTime = 0.02f * x;
+            }, 0f, transitionTime).SetUpdate(true).SetEase(Ease.OutSine);
+
+            if (m_colorAdjustments != null)
+            {
+                DOTween.To(() => m_colorAdjustments.saturation.value, x => m_colorAdjustments.saturation.value = x, -100f, transitionTime).SetUpdate(true);
+            }
+        }
 
         public void OnSylvianFailed(string reason)
         {
             OutLogger.Log($"<color=red>[Gameplay]</color> Sylvian failed: {reason}");
-            PauseGame();
+
+            // Lock Inputs Instantly
+            OutInputManager.Instance.SetGameplayInput(false);
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+
+            float transitionTime = Random.Range(0.2f, 0.5f);
+
+            // Crash time to zero
+            m_timeTween?.Kill();
+            m_timeTween = DOTween.To(() => Time.timeScale, x =>
+            {
+                Time.timeScale = x;
+                Time.fixedDeltaTime = 0.02f * x;
+            }, 0f, transitionTime).SetUpdate(true).SetEase(Ease.OutQuad);
+
+            // Spike Bloom Intensity
+            if (m_bloom != null)
+            {
+                float targetBloom = m_bloom.intensity.value + 4f; // Push intensity high
+                DOTween.To(() => m_bloom.intensity.value, x => m_bloom.intensity.value = x, targetBloom, transitionTime).SetUpdate(true);
+            }
+
+            // Push Shadows into heavy Red trackball mapping
+            if (m_smh != null)
+            {
+                Vector4 targetRedShadows = new Vector4(1.5f, 0f, 0f, 0f);
+                DOTween.To(() => m_smh.shadows.value, x => m_smh.shadows.value = x, targetRedShadows, transitionTime).SetUpdate(true);
+            }
+
+            // Render the Failure UI Panel
             OutUIManager.Instance?.ShowFailurePanel(reason);
         }
-
-        // methods indent
     }
 }

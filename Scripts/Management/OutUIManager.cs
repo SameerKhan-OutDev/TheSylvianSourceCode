@@ -14,6 +14,24 @@ namespace OutGame
         [SerializeField] private GameObject mainMenuUI;
         [SerializeField] private GameplayUI gameplayUI;
 
+        [Header("End Screens")]
+        [SerializeField] private OutFailurePanel failurePanel;
+        private OutFailurePanel FailurePanel
+        {
+            get
+            {
+                if (failurePanel == null)
+                {
+                    failurePanel = FindAnyObjectByType<OutFailurePanel>();
+                    if (failurePanel == null)
+                    {
+                        OutLogger.LogError("OutUIManager: Failure panel reference is missing! Please assign it in the inspector.");
+                    }
+                }
+                return failurePanel;
+            }
+        }
+
         [SerializeField] private DOTweenAnimation blackLoadingPanel;
 
         #region UnityLifecycle
@@ -130,9 +148,17 @@ namespace OutGame
             }
         }
 
-        internal void ShowFailurePanel(string reason)
+        public void ShowFailurePanel(string reason)
         {
-
+            if (FailurePanel != null)
+            {
+                FailurePanel.gameObject.SetActive(true);
+                FailurePanel.ShowPanel(reason);
+            }
+            else
+            {
+                OutLogger.LogError("OutUIManager: Failure panel reference is missing! Cannot display death screen.");
+            }
         }
         #endregion
     }

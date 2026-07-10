@@ -109,10 +109,8 @@ namespace OutGame
                     Time.timeScale = 1f;
                     break;
                 case OutGameState.Gameplay:
-                    Time.timeScale = 1f;
                     break;
                 case OutGameState.Paused:
-                    Time.timeScale = 0f; // Freeze game logic
                     break;
             }
         }
