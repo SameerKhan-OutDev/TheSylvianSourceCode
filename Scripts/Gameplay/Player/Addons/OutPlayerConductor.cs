@@ -17,7 +17,9 @@ namespace OutGame
 
         private CharacterController m_characterController;
         private Rigidbody[] m_boneRigidbodies;
-        private readonly int m_animHashElectrocuted = Animator.StringToHash("Electrocuted");
+
+        [Header("MxM Events")]
+        [SerializeField] private MxM.MxMEventDefinition m_electrocutedEvent;
 
         private void Awake()
         {
@@ -69,16 +71,10 @@ namespace OutGame
             }
 
             // 3. Trigger local death feedback and start async ragdoll sequence
-            if (m_animator != null)
+            if (m_mxmAnimator != null && m_electrocutedEvent != null)
             {
-                m_animator.SetTrigger(m_animHashElectrocuted);
+                m_mxmAnimator.BeginEvent(m_electrocutedEvent);
                 _ = HandleDeathSequenceAsync();
-            }
-            else
-            {
-                OutLogger.LogWarning("[OutPlayerConductor] No Animator found to play death sequence. Forcing instant ragdoll.");
-                EnableRagdoll();
-                TriggerFailure();
             }
         }
 
@@ -87,15 +83,7 @@ namespace OutGame
             // Wait a frame to ensure the Animator registers the trigger
             await Awaitable.NextFrameAsync(destroyCancellationToken);
 
-            // Wait for the Animator to transition into the "Electrocuted" state
-            while (!m_animator.GetCurrentAnimatorStateInfo(0).IsName("Electrocuted"))
-            {
-                if (destroyCancellationToken.IsCancellationRequested) return;
-                await Awaitable.NextFrameAsync(destroyCancellationToken);
-            }
-
-            // Wait until the animation finishes playing
-            while (m_animator.GetCurrentAnimatorStateInfo(0).normalizedTime < 1.0f)
+            while (m_mxmAnimator.IsEventPlaying)
             {
                 if (destroyCancellationToken.IsCancellationRequested) return;
                 await Awaitable.NextFrameAsync(destroyCancellationToken);
@@ -103,6 +91,9 @@ namespace OutGame
 
             // Hand over to physics and broadcast game over
             EnableRagdoll();
+
+            await Awaitable.WaitForSecondsAsync(1f, destroyCancellationToken);
+
             TriggerFailure();
             DisableEverything();
         }

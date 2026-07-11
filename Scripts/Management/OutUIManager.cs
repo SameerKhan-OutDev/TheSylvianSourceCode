@@ -22,7 +22,7 @@ namespace OutGame
             {
                 if (failurePanel == null)
                 {
-                    failurePanel = FindAnyObjectByType<OutFailurePanel>();
+                    failurePanel = FindAnyObjectByType<OutFailurePanel>(FindObjectsInactive.Include);
                     if (failurePanel == null)
                     {
                         OutLogger.LogError("OutUIManager: Failure panel reference is missing! Please assign it in the inspector.");
@@ -97,6 +97,18 @@ namespace OutGame
             if (newState == OutGameState.Gameplay)
             {
                 EnableGameplayUI();
+
+                // Find FailurePanel if it's not already assigned
+                if (FailurePanel != null)
+                    FailurePanel.gameObject.SetActive(false);
+                else
+                {
+                    failurePanel = FindAnyObjectByType<OutFailurePanel>(FindObjectsInactive.Include);
+                    if (failurePanel != null)
+                    {
+                        failurePanel.gameObject.SetActive(false);
+                    }
+                }
             }
             else if (newState == OutGameState.MainMenu)
             {
@@ -120,6 +132,8 @@ namespace OutGame
         public void EnableGameplayUI()
         {
             mainMenuUI.SetActive(false);
+
+            // Find and enable the GameplayUI if it's not already assigned
             if (gameplayUI != null)
                 gameplayUI.gameObject.SetActive(true);
             else
@@ -157,6 +171,7 @@ namespace OutGame
             }
             else
             {
+
                 OutLogger.LogError("OutUIManager: Failure panel reference is missing! Cannot display death screen.");
             }
         }

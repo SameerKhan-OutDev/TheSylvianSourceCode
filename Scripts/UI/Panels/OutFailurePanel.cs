@@ -35,6 +35,7 @@ namespace OutGame
 
         [Header("Controls")]
         [SerializeField] private Button m_restartButton;
+        [SerializeField] private Button m_restartCheckpointButton;
         [SerializeField] private Button m_quitMenuButton;
         #endregion
 
@@ -54,12 +55,14 @@ namespace OutGame
         private void OnEnable()
         {
             m_restartButton.onClick.AddListener(OnRestartClicked);
+            if (m_restartCheckpointButton != null) m_restartCheckpointButton.onClick.AddListener(OnRestartCheckpointClicked);
             m_quitMenuButton.onClick.AddListener(OnQuitClicked);
         }
 
         private void OnDisable()
         {
             m_restartButton.onClick.RemoveAllListeners();
+            if (m_restartCheckpointButton != null) m_restartCheckpointButton.onClick.RemoveAllListeners();
             m_quitMenuButton.onClick.RemoveAllListeners();
 
             m_animationSequence?.Kill();
@@ -134,7 +137,7 @@ namespace OutGame
             m_animationSequence.AppendInterval(1f);
 
             // Step 6: Buttons slide from position A to position B
-            m_animationSequence.Append(m_buttonsContainerRect.DOAnchorPos(m_buttonsTargetPosition, m_buttonsSlideDuration).SetEase(Ease.OutBack));
+            m_animationSequence.Append(m_buttonsContainerRect.DOAnchorPos(m_buttonsTargetPosition, m_buttonsSlideDuration).SetEase(Ease.OutExpo));
 
             // Wait for the entire sequence to finish
             await m_animationSequence.AsyncWaitForCompletion();
@@ -147,12 +150,26 @@ namespace OutGame
         #region Callbacks
         private void OnRestartClicked()
         {
+            // Restarts the entire mission from scratch
             if (OutSoundManager.Instance != null) OutSoundManager.Instance.PlayOnClickSound();
 
             if (OutGameManager.Instance != null)
             {
                 gameObject.SetActive(false);
+                OutGameManager.Instance.IsNewGameSession = true; // Forcing normal mission restart logic
                 OutGameManager.Instance.RestartCurrentLevel();
+            }
+        }
+
+        private void OnRestartCheckpointClicked()
+        {
+            // Reloads the exact scene but forces a save state integration
+            if (OutSoundManager.Instance != null) OutSoundManager.Instance.PlayOnClickSound();
+
+            if (OutGameManager.Instance != null)
+            {
+                gameObject.SetActive(false);
+                OutGameManager.Instance.ContinueGame();
             }
         }
 

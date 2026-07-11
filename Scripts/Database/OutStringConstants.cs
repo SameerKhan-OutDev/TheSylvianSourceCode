@@ -85,7 +85,8 @@ namespace OutGame
         // --------------------------------------------------------
         public static class Scenes
         {
-            public const string MainMenu = "MainMenu";
+            public const string MainMenu = "2_MainMenu";
+            public const string LoadingScreen = "1_LoadingScreen";
             public const string Prologue = "Level_00_Prologue";
             public const string LatticeFacility = "Level_01_Lattice";
         }

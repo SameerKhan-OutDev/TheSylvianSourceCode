@@ -167,6 +167,26 @@ namespace OutGame
             return null;
         }
 
+        /// <summary>
+        /// Loads save data from a specific absolute file path.
+        /// </summary>
+        public SaveData LoadGameFromPath(string fullPath)
+        {
+            if (!string.IsNullOrEmpty(fullPath) && File.Exists(fullPath))
+            {
+                try
+                {
+                    string json = File.ReadAllText(fullPath);
+                    return JsonUtility.FromJson<SaveData>(json);
+                }
+                catch (Exception e)
+                {
+                    OutLogger.LogError($"[OutSaveController] Save file corrupted at {fullPath}: {e.Message}");
+                }
+            }
+            return null;
+        }
+
         public void DeleteSave(int slotIndex)
         {
             string filePath = GetFilePathForSlot(slotIndex);
@@ -176,6 +196,8 @@ namespace OutGame
                 OutLogger.Log($"<color=red>[OutSaveController]</color> Deleted save slot: {slotIndex}");
             }
         }
+
+
 
         // Helper to get the correct documents path
         private string GetSaveFolderPath()

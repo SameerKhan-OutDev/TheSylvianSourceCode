@@ -146,8 +146,18 @@ namespace OutGame
 
         private void ResumeSavedGame()
         {
-            int activeSlot = OutGameManager.Instance != null ? OutGameManager.Instance.CurrentSaveSlot : 0;
-            SaveData data = OutSaveController.Instance?.LoadGame(activeSlot);
+            SaveData data = null;
+
+            // Load directly from the path tracked by the game manager (targets quick saves and slot saves accurately)
+            if (OutGameManager.Instance != null && !string.IsNullOrEmpty(OutGameManager.Instance.ActiveSaveFilePath))
+            {
+                data = OutSaveController.Instance?.LoadGameFromPath(OutGameManager.Instance.ActiveSaveFilePath);
+            }
+            else
+            {
+                // Fallback in case of unexpected direct scene loading
+                data = OutSaveController.Instance?.GetLatestSaveData(out _);
+            }
 
             if (data != null)
             {
@@ -157,11 +167,18 @@ namespace OutGame
                     playerTransform.rotation = data.playerRotation;
                 }
 
-                var allSaveables = FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None).OfType<ISaveable>();
+                // Restore all ISaveable entities (traps, AI, puzzle zones, terminals)
+                var allSaveables = FindObjectsByType<MonoBehaviour>().OfType<ISaveable>();
                 foreach (var saveable in allSaveables)
                 {
                     saveable.RestoreFromSaveData(data);
                 }
+
+                OutLogger.Log("<color=cyan>[Gameplay]</color> World state and player position restored successfully.");
+            }
+            else
+            {
+                OutLogger.LogWarning("[Gameplay] Failed to load save data file. Starting with default state.");
             }
 
             StartGameplay();

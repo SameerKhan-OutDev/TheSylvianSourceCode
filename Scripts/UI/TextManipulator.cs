@@ -35,9 +35,12 @@ namespace OutGame
 
         [Header("Instability & Timing")]
         [Tooltip("If true, switch delay is randomized between the min/max range. If false, it uses a constant delay (the Min value).")]
-        public bool useUnstableDelay;
+        [SerializeField] public bool useUnstableDelay;
         [Tooltip("X is Minimum delay, Y is Maximum delay (in milliseconds).")]
         public Vector2Int switchDelayRangeMs = new Vector2Int(1000, 3000);
+
+        [Tooltip("If true, all text animations will ignore Time.timeScale and run in real-time.")]
+        [SerializeField] public bool useUnscaledTime;
 
         [Header("Visual Style")]
         public TextVisualStyle visualStyle = TextVisualStyle.Constant;
@@ -86,6 +89,27 @@ namespace OutGame
             _ = ApplyVisualStyleAsync();
         }
 
+        /// <summary>
+        /// Custom wait helper that bridges standard delays and unscaled time delays based on inspector settings.
+        /// </summary>
+        private async Awaitable WaitAsync(float delaySec, System.Threading.CancellationToken token)
+        {
+            if (useUnscaledTime)
+            {
+                float timer = 0f;
+                while (timer < delaySec)
+                {
+                    token.ThrowIfCancellationRequested();
+                    timer += Time.unscaledDeltaTime;
+                    await Awaitable.NextFrameAsync(token);
+                }
+            }
+            else
+            {
+                await Awaitable.WaitForSecondsAsync(delaySec, token);
+            }
+        }
+
         private async Awaitable ManipulateTextAsync()
         {
             if (targetMode == ManipulationTarget.StringList && (manipulations == null || manipulations.Count == 0 || text == null)) return;
@@ -121,7 +145,9 @@ namespace OutGame
                     await ApplyTextEffectAsync(statement, currentActiveText);
 
                     int delayMs = useUnstableDelay ? Random.Range(switchDelayRangeMs.x, switchDelayRangeMs.y) : switchDelayRangeMs.x;
-                    await Awaitable.WaitForSecondsAsync(delayMs / 1000f, destroyCancellationToken);
+
+                    // Replace standard wait with our custom WaitAsync
+                    await WaitAsync(delayMs / 1000f, destroyCancellationToken);
 
                     if (manipulationMode == TextManipulationMode.Loop)
                     {
@@ -156,7 +182,9 @@ namespace OutGame
                     {
                         if (destroyCancellationToken.IsCancellationRequested) return;
                         targetComponent.text += c;
-                        await Awaitable.WaitForSecondsAsync(delayBetweenCharacters, destroyCancellationToken);
+
+                        // Replace standard wait
+                        await WaitAsync(delayBetweenCharacters, destroyCancellationToken);
                     }
                     break;
                 case TextEffectMode.WordByWord:
@@ -165,7 +193,9 @@ namespace OutGame
                     {
                         if (destroyCancellationToken.IsCancellationRequested) return;
                         targetComponent.text += words[i] + " ";
-                        await Awaitable.WaitForSecondsAsync(delayBetweenWords, destroyCancellationToken);
+
+                        // Replace standard wait
+                        await WaitAsync(delayBetweenWords, destroyCancellationToken);
                     }
                     break;
             }
@@ -197,13 +227,13 @@ namespace OutGame
                         case TextVisualStyle.HighLow:
                             toggleState = !toggleState;
                             SetAlpha(currentActiveText, toggleState ? 1f : 0.5f);
-                            await Awaitable.WaitForSecondsAsync(delaySec, destroyCancellationToken);
+                            await WaitAsync(delaySec, destroyCancellationToken);
                             break;
 
                         case TextVisualStyle.OnOff:
                             toggleState = !toggleState;
                             SetAlpha(currentActiveText, toggleState ? 1f : 0f);
-                            await Awaitable.WaitForSecondsAsync(delaySec, destroyCancellationToken);
+                            await WaitAsync(delaySec, destroyCancellationToken);
                             break;
 
                         case TextVisualStyle.FadeInOut:
@@ -214,7 +244,8 @@ namespace OutGame
 
                             while (elapsed < delaySec && !destroyCancellationToken.IsCancellationRequested)
                             {
-                                elapsed += Time.deltaTime;
+                                // Adjust time scale integration for Fade looping
+                                elapsed += useUnscaledTime ? Time.unscaledDeltaTime : Time.deltaTime;
                                 SetAlpha(currentActiveText, Mathf.Lerp(startAlpha, targetAlpha, elapsed / delaySec));
                                 await Awaitable.NextFrameAsync(destroyCancellationToken);
                             }
@@ -222,7 +253,7 @@ namespace OutGame
 
                         case TextVisualStyle.RandomColor:
                             currentActiveText.color = Random.ColorHSV(0f, 1f, 0.8f, 1f, 0.8f, 1f);
-                            await Awaitable.WaitForSecondsAsync(delaySec, destroyCancellationToken);
+                            await WaitAsync(delaySec, destroyCancellationToken);
                             break;
 
                         case TextVisualStyle.Glitch:
@@ -230,7 +261,7 @@ namespace OutGame
                             currentActiveText.rectTransform.anchoredPosition = new Vector2(
                                 Random.Range(-glitchIntensity, glitchIntensity),
                                 Random.Range(-glitchIntensity, glitchIntensity));
-                            await Awaitable.WaitForSecondsAsync(delaySec * 0.2f, destroyCancellationToken); // Glitch runs faster
+                            await WaitAsync(delaySec * 0.2f, destroyCancellationToken);
                             break;
                     }
 

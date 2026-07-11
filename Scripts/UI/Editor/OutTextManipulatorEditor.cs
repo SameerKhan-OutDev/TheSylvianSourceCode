@@ -34,6 +34,7 @@ public class OutTextManipulatorEditor : Editor
     // 5. Instability
     SerializedProperty useUnstableDelay;
     SerializedProperty switchDelayRangeMs;
+    SerializedProperty useUnscaledTime; // NEW: Added unscaled time property
 
     // --- PREVIEW TRACKING ---
     private CancellationTokenSource previewCts;
@@ -60,6 +61,7 @@ public class OutTextManipulatorEditor : Editor
 
         useUnstableDelay = serializedObject.FindProperty("useUnstableDelay");
         switchDelayRangeMs = serializedObject.FindProperty("switchDelayRangeMs");
+        useUnscaledTime = serializedObject.FindProperty("useUnscaledTime"); // Bind property
     }
 
     private void OnDisable()
@@ -129,7 +131,7 @@ public class OutTextManipulatorEditor : Editor
         }
         EditorGUILayout.EndVertical();
 
-        // Section 4: Visual Style (NEW)
+        // Section 4: Visual Style
         EditorGUILayout.BeginVertical(boxStyle);
         EditorGUILayout.LabelField("4. Visual Style", EditorStyles.boldLabel);
         EditorGUILayout.PropertyField(visualStyle);
@@ -149,6 +151,9 @@ public class OutTextManipulatorEditor : Editor
         EditorGUILayout.BeginVertical(boxStyle);
         EditorGUILayout.LabelField("5. Instability & Timing", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox("These delays dictate both the text switching speed AND the visual style frequency.", MessageType.None);
+
+        EditorGUILayout.PropertyField(useUnscaledTime, new GUIContent("Use Unscaled Time")); // Draw new property
+
         EditorGUILayout.PropertyField(useUnstableDelay, new GUIContent("Use Unstable Delay?"));
 
         if (useUnstableDelay.boolValue)
@@ -233,7 +238,17 @@ public class OutTextManipulatorEditor : Editor
 
         int currentIndex = 0;
         int direction = 1;
-        int maxCount = script.targetMode == ManipulationTarget.StringList ? script.manipulations.Count : script.textComponents.Count;
+
+        // Added null checks to prevent unhandled exceptions if lists are uninitialized
+        int maxCount = 0;
+        if (script.targetMode == ManipulationTarget.StringList)
+        {
+            maxCount = script.manipulations != null ? script.manipulations.Count : 0;
+        }
+        else
+        {
+            maxCount = script.textComponents != null ? script.textComponents.Count : 0;
+        }
 
         if (maxCount == 0)
         {
@@ -295,7 +310,14 @@ public class OutTextManipulatorEditor : Editor
         catch (OperationCanceledException) { /* Task killed safely */ }
         finally
         {
+            // FIX: Ensure previewCts is disposed and nullified so future clicks work
+            if (previewCts != null)
+            {
+                previewCts.Dispose();
+                previewCts = null;
+            }
             RestoreTextStates(script);
+            Repaint(); // Force inspector to update Play/Stop button state
         }
     }
 
@@ -307,6 +329,9 @@ public class OutTextManipulatorEditor : Editor
         {
             targetComponent.text = t;
             EditorUtility.SetDirty(targetComponent);
+
+            // FIX: Force Unity to redraw the view so you actually see the preview typing out live
+            SceneView.RepaintAll();
         }
 
         switch (script.effectMode)
@@ -380,6 +405,8 @@ public class OutTextManipulatorEditor : Editor
                 }
             }
         }
+
+        SceneView.RepaintAll();
     }
 }
 #endif

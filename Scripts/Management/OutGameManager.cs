@@ -31,6 +31,7 @@ namespace OutGame
         public bool IsNewGameSession { get; internal set; }
         public int CurrentSaveSlot { get; set; }
 
+        public string ActiveSaveFilePath { get; set; }
         #endregion
 
         #region delegates
@@ -155,6 +156,7 @@ namespace OutGame
 
             OutSoundManager.Instance.StopMusic(false);
             IsNewGameSession = true;
+            ActiveSaveFilePath = string.Empty;
             StartLoadingScene(firstMissionScene);
         }
 
@@ -177,6 +179,7 @@ namespace OutGame
                 {
                     OutLogger.Log($"[OutGameManager] Latest save found: {latestData.saveName}.");
                     CurrentSaveSlot = latestData.saveSlotIndex;
+                    ActiveSaveFilePath = filePath;
                     OutSoundManager.Instance.StopMusic(false);
                     IsNewGameSession = false;
                     StartLoadingScene(latestData.sceneName);
