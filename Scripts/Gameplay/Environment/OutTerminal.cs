@@ -71,7 +71,7 @@ namespace OutGame // Make sure this matches your project's namespace
         {
             if (_isUnlocked) return;
             // You can trigger your custom reticle or emissive highlights here
-            OutLogger.Log($"[OutTerminal] Aiming at {gameObject.name}");
+            OutLogger.Note($"[OutTerminal] Aiming at {gameObject.name}");
         }
 
         public void OnAimExit()
@@ -83,7 +83,7 @@ namespace OutGame // Make sure this matches your project's namespace
         {
             if (_isUnlocked) return;
 
-            OutLogger.Log($"[OutTerminal] Interacted by {a_instigator.name}");
+            OutLogger.Note($"[OutTerminal] Interacted by {a_instigator.name}");
 
             // 1. Lock Player Movement/Camera and switch to UI map
             // Using your actual OutInputManager methods
@@ -96,12 +96,12 @@ namespace OutGame // Make sure this matches your project's namespace
             if (puzzleSolved)
             {
                 _isUnlocked = true;
-                OutLogger.Log($"[OutTerminal] Access Granted.");
+                OutLogger.Note($"[OutTerminal] Access Granted.");
                 OnTerminalUnlocked?.Invoke();
 
                 if (autosaveOnUnlock && OutSaveController.Instance != null && OutGameSceneDirector.Instance != null)
                 {
-                    OutLogger.Log($"<color=cyan>[OutTerminal]</color> Autosaving after successful hack...");
+                    OutLogger.Note($"<color=cyan>[OutTerminal]</color> Autosaving after successful hack...");
 
                     OutSaveController.Instance.SaveGame(
                         narrativeMissionName,
@@ -113,7 +113,7 @@ namespace OutGame // Make sure this matches your project's namespace
             }
             else
             {
-                OutLogger.LogWarning($"[OutTerminal] Access Denied.");
+                OutLogger.Warn($"[OutTerminal] Access Denied.");
                 OnTerminalHackedFailed?.Invoke();
             }
 

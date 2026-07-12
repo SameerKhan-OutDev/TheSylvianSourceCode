@@ -167,7 +167,7 @@ namespace OutGame
         {
             if (_selectedData == null) return;
 
-            OutLogger.Log($"[OutLoadGamePanel] Launching Game via Slot {_selectedSlotIndex}");
+            OutLogger.Note($"[OutLoadGamePanel] Launching Game via Slot {_selectedSlotIndex}");
 
             PlayerPrefs.SetInt("LastSaveSlot", _selectedSlotIndex);
             PlayerPrefs.Save();

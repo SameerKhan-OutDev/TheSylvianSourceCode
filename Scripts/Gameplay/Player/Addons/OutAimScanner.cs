@@ -120,13 +120,13 @@ namespace OutGame
         {
             m_currentMode = EAimScannerMode.CommandTargeting;
 
-            OutLogger.Log("Entering command targeting mode.");
+            OutLogger.Note("Entering command targeting mode.");
             m_aiPendingCommand = a_afflicted;
 
             ClearCurrentTarget(); // Stop highlighting props
 
             if (targetMarker != null) targetMarker.gameObject.SetActive(false);
-            else OutLogger.LogError("Target marker is null. Can't activate it.");
+            else OutLogger.Error("Target marker is null. Can't activate it.");
 
             if (OutUIManager.Instance != null)
             {
@@ -145,7 +145,7 @@ namespace OutGame
                 {
                     targetMarker.position = hitInfo.point;
                 }
-                else OutLogger.LogError("Target marker is null. Can't activate it.");
+                else OutLogger.Error("Target marker is null. Can't activate it.");
 
                 if (OutInputManager.Instance.InputActions.Player.Attack.WasPressedThisFrame())
                 {
@@ -158,14 +158,14 @@ namespace OutGame
         {
             if (m_aiPendingCommand != null)
             {
-                OutLogger.Log("Executing command.");
+                OutLogger.Note("Executing command.");
                 m_aiPendingCommand.ExecuteFleeMove(a_destination);
             }
-            else OutLogger.LogError("No pending command to execute and you tried to execute one.");
+            else OutLogger.Error("No pending command to execute and you tried to execute one.");
 
             // Reset back to standard scanning
             m_currentMode = EAimScannerMode.StandardScan;
-            OutLogger.Log("Exiting command targeting mode.");
+            OutLogger.Note("Exiting command targeting mode.");
             m_aiPendingCommand = null;
 
             if (targetMarker != null) targetMarker.gameObject.SetActive(false);

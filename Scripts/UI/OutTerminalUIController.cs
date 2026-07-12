@@ -28,7 +28,7 @@ namespace OutGame
 
             if (activePuzzle == null)
             {
-                OutLogger.LogError($"No puzzle panel found for terminal type: {terminal.puzzleType}");
+                OutLogger.Error($"No puzzle panel found for terminal type: {terminal.puzzleType}");
                 return false;
             }
 

@@ -331,13 +331,13 @@ namespace OutGame
             if (fullGridString.Contains(_targetWord))
             {
                 OutSoundManager.Instance.PlayUISound(soundSuccess, true);
-                OutLogger.Log("[WordPuzzle] Correct!");
+                OutLogger.Note("[WordPuzzle] Correct!");
                 CompletePuzzle(true);
             }
             else
             {
                 OutSoundManager.Instance.PlayUISound(soundFail, true);
-                OutLogger.Log("[WordPuzzle] Incorrect Word. Try again.");
+                OutLogger.Note("[WordPuzzle] Incorrect Word. Try again.");
                 puzzleCanvasGroup.transform.DOShakePosition(0.5f, 5f);
             }
         }
@@ -372,7 +372,7 @@ namespace OutGame
         public void CancelPuzzle()
         {
             OutSoundManager.Instance.PlayUISound(soundCancel, true);
-            OutLogger.Log("Puzzle Cancelled by User.");
+            OutLogger.Note("Puzzle Cancelled by User.");
             CompletePuzzle(false);
         }
     }

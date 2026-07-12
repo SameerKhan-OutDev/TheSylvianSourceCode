@@ -188,7 +188,7 @@ namespace OutGame
         #region IOutConductor Implementation (The Spark Trap)
         public void OnElectrocuted(Transform attachPoint)
         {
-            OutLogger.Log("Electrocuted");
+            OutLogger.Note("Electrocuted");
             // The AI walked into the trap
             _currentState = EAfflictedCurrentState.Dead;
 

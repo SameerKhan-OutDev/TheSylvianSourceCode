@@ -47,7 +47,7 @@ namespace OutGame
                 // Use the teleport position if provided, otherwise grab the player's current physical transform
                 Transform savePosition = playerPosition != null ? playerPosition : OutGameSceneDirector.Instance.playerTransform;
 
-                OutLogger.Log($"<color=cyan>[CinematicTrigger]</color> Cinematic finished. Autosaving at {narrativeLocationMemory}...");
+                OutLogger.Note($"<color=cyan>[CinematicTrigger]</color> Cinematic finished. Autosaving at {narrativeLocationMemory}...");
 
                 // 3. Trigger the Autosave!
                 OutSaveController.Instance.SaveGame(

@@ -61,7 +61,7 @@ namespace OutGame
             }
             else
             {
-                OutLogger.LogWarning("OutThirdPersonCamera: No follow target assigned!", "yellow");
+                this.Warn("OutThirdPersonCamera: No follow target assigned!");
             }
         }
 

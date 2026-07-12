@@ -118,11 +118,11 @@ namespace OutGame
                 string filePath = Path.Combine(fullPath, defaultFileName);
                 File.WriteAllText(filePath, json);
 
-                OutLogger.Log($"<color=green>[OutSaveController]</color> Game saved successfully at: {filePath}");
+                OutLogger.Note($"<color=green>[OutSaveController]</color> Game saved successfully at: {filePath}");
             }
             catch (Exception e)
             {
-                OutLogger.LogError($"[OutSaveController] Failed to save game: {e.Message}");
+                OutLogger.Error($"[OutSaveController] Failed to save game: {e.Message}");
             }
         }
 
@@ -140,18 +140,18 @@ namespace OutGame
                 {
                     string json = File.ReadAllText(filePath);
                     SaveData data = JsonUtility.FromJson<SaveData>(json);
-                    OutLogger.Log($"<color=cyan>[OutSaveController]</color> Game loaded: {data.lastPlayedTime}");
+                    OutLogger.Note($"<color=cyan>[OutSaveController]</color> Game loaded: {data.lastPlayedTime}");
                     return data;
                 }
                 catch (Exception e)
                 {
-                    OutLogger.LogError($"[OutSaveController] Save file corrupted: {e.Message}");
+                    OutLogger.Error($"[OutSaveController] Save file corrupted: {e.Message}");
                     return null;
                 }
             }
             else
             {
-                OutLogger.LogWarning("[OutSaveController] No save file found.");
+                OutLogger.Warn("[OutSaveController] No save file found.");
                 return null;
             }
         }
@@ -181,7 +181,7 @@ namespace OutGame
                 }
                 catch (Exception e)
                 {
-                    OutLogger.LogError($"[OutSaveController] Save file corrupted at {fullPath}: {e.Message}");
+                    OutLogger.Error($"[OutSaveController] Save file corrupted at {fullPath}: {e.Message}");
                 }
             }
             return null;
@@ -193,7 +193,7 @@ namespace OutGame
             if (File.Exists(filePath))
             {
                 File.Delete(filePath);
-                OutLogger.Log($"<color=red>[OutSaveController]</color> Deleted save slot: {slotIndex}");
+                OutLogger.Note($"<color=red>[OutSaveController]</color> Deleted save slot: {slotIndex}");
             }
         }
 
@@ -244,7 +244,7 @@ namespace OutGame
                 }
                 catch (Exception e)
                 {
-                    OutLogger.LogWarning($"[OutSaveController] Skipped unreadable save file during latest check: {e.Message}");
+                    OutLogger.Warn($"[OutSaveController] Skipped unreadable save file during latest check: {e.Message}");
                 }
             }
 

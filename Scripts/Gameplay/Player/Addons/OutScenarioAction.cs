@@ -1,4 +1,3 @@
-using TimeGhost;
 using UnityEngine;
 
 namespace OutGame
@@ -78,7 +77,7 @@ namespace OutGame
             }
             else
             {
-                OutLogger.LogError("OutScenarioAction: Could not find OutPlayerController to restore state.");
+                OutLogger.Error("OutScenarioAction: Could not find OutPlayerController to restore state.");
             }
         }
     }

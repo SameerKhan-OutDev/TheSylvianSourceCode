@@ -1,7 +1,6 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using TimeGhost;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.SceneManagement;
@@ -81,7 +80,7 @@ namespace OutGame
 
         private async void InitializeSystems()
         {
-            OutLogger.Log("<color=cyan>[OutGameManager]</color> Initializing Systems...");
+            OutLogger.Note("<color=cyan>[OutGameManager]</color> Initializing Systems...");
 
             await Task.Delay(100); // Simulate async initialization
             if (inputManager == null) inputManager = OutInputManager.Instance;
@@ -90,9 +89,9 @@ namespace OutGame
 
             // Optional: Check for Save Controller
             if (OutSaveController.Instance == null)
-                OutLogger.LogWarning("[OutGameManager] OutSaveController not found. Saving/Loading may fail.");
+                OutLogger.Warn("[OutGameManager] OutSaveController not found. Saving/Loading may fail.");
 
-            OutLogger.Log("<color=green>[OutGameManager]</color> Initialization Complete.");
+            OutLogger.Note("<color=green>[OutGameManager]</color> Initialization Complete.");
         }
 
         public void ChangeState(OutGameState newState)
@@ -102,7 +101,7 @@ namespace OutGame
             currentState = newState;
             StateChanged?.Invoke(currentState); // Notify listeners
 
-            OutLogger.Log($"State Changed to {currentState}");
+            OutLogger.Note($"State Changed to {currentState}");
 
             switch (currentState)
             {
@@ -124,21 +123,50 @@ namespace OutGame
 
         public async Awaitable LoadGameScene(string sceneName)
         {
-            OutLogger.Log($"[OutGameManager] Loading scene: {sceneName}");
+            OutLogger.Note($"[OutGameManager] Loading scene: {sceneName}");
             SceneLoadingStarted?.Invoke(sceneName);
 
             try
             {
-                // 1. Load the scene and await the operation directly
-                await SceneManager.LoadSceneAsync(sceneName);
+                // Capture current scene before doing anything
+                Scene oldScene = SceneManager.GetActiveScene();
 
-                // 2. Fire the finish event
+                // 1. Load the lightweight loading scene additively
+                await SceneManager.LoadSceneAsync(OutStringConstants.Scenes.LoadingScreen, LoadSceneMode.Additive);
+
+                // FIX 1: Reset TimeScale so background Awaitables and Animations don't permanently freeze
+                Time.timeScale = 1f;
+
+                // FIX 2: Yield back to the Unity main thread for a couple of frames so the Loading UI ACTUALLY renders to the screen
+                await Awaitable.NextFrameAsync();
+                await Awaitable.NextFrameAsync();
+
+                // FIX 3: Unload the old scene FIRST. 
+                // If we load the new scene while the old one is active, all Singletons in the new scene will destroy themselves thinking they are duplicates!
+                if (oldScene.IsValid() && oldScene.name != OutStringConstants.Scenes.LoadingScreen)
+                {
+                    await SceneManager.UnloadSceneAsync(oldScene);
+                    await Awaitable.NextFrameAsync(); // Give Unity a frame to clear destroyed objects from memory
+                }
+
+                // 2. Load the target scene additively in the background
+                await SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Additive);
+
+                // 3. Find the newly loaded scene and set it as Active (vital for lighting/skyboxes)
+                Scene newScene = SceneManager.GetSceneAt(SceneManager.sceneCount - 1);
+                SceneManager.SetActiveScene(newScene);
+
+                // Yield a frame so all the Awake() and Start() methods in the new scene initialize smoothly behind the loading screen
+                await Awaitable.NextFrameAsync();
+
+                // 4. Assets are ready. Unload the additive loading screen.
+                await SceneManager.UnloadSceneAsync(OutStringConstants.Scenes.LoadingScreen);
+
                 SceneLoadingCompleted?.Invoke(sceneName);
-
             }
             catch (OperationCanceledException)
             {
-                OutLogger.Log("Scene load was cancelled because the object was destroyed.");
+                OutLogger.Note("Scene load was cancelled because the object was destroyed.");
             }
         }
 
@@ -148,7 +176,7 @@ namespace OutGame
 
         public void StartNewGame()
         {
-            OutLogger.Log("[OutGameManager] Starting New Game...");
+            OutLogger.Note("[OutGameManager] Starting New Game...");
 
             // Optional: If you want to wipe previous autosaves on New Game:
 
@@ -162,11 +190,11 @@ namespace OutGame
 
         public bool ContinueGame()
         {
-            OutLogger.Log("[OutGameManager] Attempting to Continue from the latest save...");
+            OutLogger.Note("[OutGameManager] Attempting to Continue from the latest save...");
 
             if (OutSaveController.Instance == null)
             {
-                OutLogger.LogError("[OutGameManager] OutSaveController is missing!");
+                OutLogger.Error("[OutGameManager] OutSaveController is missing!");
                 return false;
             }
 
@@ -177,7 +205,7 @@ namespace OutGame
 
                 if (latestData != null && !string.IsNullOrEmpty(latestData.sceneName))
                 {
-                    OutLogger.Log($"[OutGameManager] Latest save found: {latestData.saveName}.");
+                    OutLogger.Note($"[OutGameManager] Latest save found: {latestData.saveName}.");
                     CurrentSaveSlot = latestData.saveSlotIndex;
                     ActiveSaveFilePath = filePath;
                     OutSoundManager.Instance.StopMusic(false);
@@ -187,21 +215,21 @@ namespace OutGame
                 }
                 else
                 {
-                    OutLogger.LogWarning("[OutGameManager] No valid save file found.");
+                    OutLogger.Warn("[OutGameManager] No valid save file found.");
                     return false;
                 }
             }
             catch (System.Exception ex)
             {
                 // THIS will catch the silent killer and tell us exactly what it is!
-                OutLogger.LogError($"[OutGameManager] FATAL CRASH during ContinueGame: {ex.Message}\n{ex.StackTrace}");
+                OutLogger.Error($"[OutGameManager] FATAL CRASH during ContinueGame: {ex.Message}\n{ex.StackTrace}");
                 return false; // Still return false so your UI Panel opens!
             }
         }
 
         public void TriggerSylvianFailed(string failureReason)
         {
-            OutLogger.Log($"<color=red>[OutGameManager]</color> Sylvian Failed! Reason: {failureReason}");
+            OutLogger.Note($"<color=red>[OutGameManager]</color> Sylvian Failed! Reason: {failureReason}");
 
             // Optional: Change game state to freeze background elements or pause
             ChangeState(OutGameState.Paused);
@@ -213,14 +241,14 @@ namespace OutGame
         public void RestartCurrentLevel()
         {
             string currentScene = SceneManager.GetActiveScene().name;
-            OutLogger.Log($"[OutGameManager] Restarting level: {currentScene}");
+            OutLogger.Note($"[OutGameManager] Restarting level: {currentScene}");
             OutSoundManager.Instance.StopMusic(true);
             StartLoadingScene(currentScene);
         }
 
         public void QuitGame()
         {
-            OutLogger.Log("[OutGameManager] Quitting Application.");
+            OutLogger.Note("[OutGameManager] Quitting Application.");
             Application.Quit();
 
 #if UNITY_EDITOR

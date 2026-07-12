@@ -59,7 +59,7 @@ namespace OutGame
                 OutGameManager.Instance.StateChanged += OnGameStateChanged;
                 OutGameManager.Instance.SylvianFailed += OnSylvianFailed;
             }
-            else OutLogger.LogError("Game Manager Instance doesn't exist, skipping Game State Change.");
+            else OutLogger.Error("Game Manager Instance doesn't exist, skipping Game State Change.");
         }
 
         private void OnDisable()
@@ -116,7 +116,7 @@ namespace OutGame
 
         private async Awaitable SetupNewGameAsync()
         {
-            OutLogger.Log("<color=cyan>[Gameplay]</color> Initializing Fresh Game.");
+            OutLogger.Note("<color=cyan>[Gameplay]</color> Initializing Fresh Game.");
 
             if (playerTransform != null && defaultSpawnPoint != null)
             {
@@ -174,11 +174,11 @@ namespace OutGame
                     saveable.RestoreFromSaveData(data);
                 }
 
-                OutLogger.Log("<color=cyan>[Gameplay]</color> World state and player position restored successfully.");
+                OutLogger.Note("<color=cyan>[Gameplay]</color> World state and player position restored successfully.");
             }
             else
             {
-                OutLogger.LogWarning("[Gameplay] Failed to load save data file. Starting with default state.");
+                OutLogger.Warn("[Gameplay] Failed to load save data file. Starting with default state.");
             }
 
             StartGameplay();
@@ -186,7 +186,7 @@ namespace OutGame
 
         public async Awaitable StartCutscene(OutCinematicData cutsceneAsset, Transform playerPos = null)
         {
-            OutLogger.Log("<color=yellow>[Cutscene]</color> Starting Cutscene.");
+            OutLogger.Note("<color=yellow>[Cutscene]</color> Starting Cutscene.");
 
             if (playerTransform != null && playerPos != null)
             {
@@ -231,7 +231,7 @@ namespace OutGame
         public void StartGameplay()
         {
             if (OutGameManager.Instance != null && OutGameManager.Instance.currentState == OutGameState.Gameplay) return;
-            OutLogger.Log("<color=green>[Gameplay]</color> Player now has control.");
+            OutLogger.Note("<color=green>[Gameplay]</color> Player now has control.");
 
             OutInputManager.Instance.SetGameplayInput(true);
             Cinematics.SetActive(false);
@@ -300,7 +300,7 @@ namespace OutGame
 
         public void OnSylvianFailed(string reason)
         {
-            OutLogger.Log($"<color=red>[Gameplay]</color> Sylvian failed: {reason}");
+            OutLogger.Note($"<color=red>[Gameplay]</color> Sylvian failed: {reason}");
 
             // Lock Inputs Instantly
             OutInputManager.Instance.SetGameplayInput(false);

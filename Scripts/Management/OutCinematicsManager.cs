@@ -59,7 +59,7 @@ namespace OutGame
             {
                 if (cinematicData.isSkippable && OutInputManager.Instance.InputActions.UI.Cancel.WasPressedThisFrame())
                 {
-                    OutLogger.Log("[OutCinematicManager] Skip input detected.");
+                    OutLogger.Note("[OutCinematicManager] Skip input detected.");
                     break;
                 }
 

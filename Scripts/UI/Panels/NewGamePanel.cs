@@ -77,7 +77,7 @@ namespace OutGame
 
                 OutGameManager.Instance.StartNewGame();
                 OutGameManager.Instance.CurrentSaveSlot = index;
-                OutLogger.Log($"Slot {index} — Game started.");
+                OutLogger.Note($"Slot {index} — Game started.");
                 OutMenuController.MainMenuInstance.HideAllPanelsInstant();
                 OutMenuController.MainMenuInstance.gameObject.SetActive(false);
             });

@@ -54,7 +54,7 @@ namespace OutGame
 
         public void OnElectrocuted(Transform attachPoint)
         {
-            OutLogger.Log("<color=orange>[OutPlayerConductor]</color> Player stepped into a Spark Trap!");
+            OutLogger.Note("<color=orange>[OutPlayerConductor]</color> Player stepped into a Spark Trap!");
 
             // 1. Strip player control
             DisablePlayerLocomotion();
@@ -67,7 +67,7 @@ namespace OutGame
             }
             else
             {
-                OutLogger.LogWarning("[OutPlayerConductor] Trap attach point is null. Skipping physical snap.");
+                OutLogger.Warn("[OutPlayerConductor] Trap attach point is null. Skipping physical snap.");
             }
 
             // 3. Trigger local death feedback and start async ragdoll sequence
@@ -128,7 +128,7 @@ namespace OutGame
             }
             else
             {
-                OutLogger.LogError("[OutPlayerConductor] OutGameManager Instance is missing! Cannot trigger global failure state.");
+                OutLogger.Error("[OutPlayerConductor] OutGameManager Instance is missing! Cannot trigger global failure state.");
             }
         }
 

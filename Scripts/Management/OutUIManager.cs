@@ -25,7 +25,7 @@ namespace OutGame
                     failurePanel = FindAnyObjectByType<OutFailurePanel>(FindObjectsInactive.Include);
                     if (failurePanel == null)
                     {
-                        OutLogger.LogError("OutUIManager: Failure panel reference is missing! Please assign it in the inspector.");
+                        OutLogger.Error("OutUIManager: Failure panel reference is missing! Please assign it in the inspector.");
                     }
                 }
                 return failurePanel;
@@ -172,7 +172,7 @@ namespace OutGame
             else
             {
 
-                OutLogger.LogError("OutUIManager: Failure panel reference is missing! Cannot display death screen.");
+                OutLogger.Error("OutUIManager: Failure panel reference is missing! Cannot display death screen.");
             }
         }
         #endregion

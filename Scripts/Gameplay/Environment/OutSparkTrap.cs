@@ -57,7 +57,7 @@ namespace OutGame
 
         private void OnTriggerEnter(Collider other)
         {
-            OutLogger.Log($"Spark Trap triggered by {other.name}");
+            OutLogger.Note($"Spark Trap triggered by {other.name}");
             if (!_isActive) return;
 
             // Check if the object entering has the conductor interface
@@ -67,7 +67,7 @@ namespace OutGame
             {
                 _isActive = false;
 
-                OutLogger.Log($"Electrocuting {other.name} at position {_attachedTargetPosition.position}");
+                OutLogger.Note($"Electrocuting {other.name} at position {_attachedTargetPosition.position}");
 
                 // Swap the particle states
                 if (_blockingSegmentParticles != null) _blockingSegmentParticles.SetActive(false);

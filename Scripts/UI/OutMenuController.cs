@@ -191,7 +191,7 @@ namespace OutGame
         {
             if (_isTransitioning)
             {
-                OutLogger.LogError("OutMenuController: Transition in progress. Back action ignored.");
+                OutLogger.Error("OutMenuController: Transition in progress. Back action ignored.");
                 return;
             }
 
@@ -205,7 +205,7 @@ namespace OutGame
 
             if (_history.Count == 0)
             {
-                if (printLogs) OutLogger.LogError("OutMenuController: History stack is empty. Cannot go back.");
+                if (printLogs) OutLogger.Error("OutMenuController: History stack is empty. Cannot go back.");
                 return;
             }
 
@@ -297,7 +297,7 @@ namespace OutGame
             if (_isTransitioning) return; // Prevent double-clicking from corrupting the stack
 
             AButtonClicked?.Invoke();
-            if (printLogs) OutLogger.Log($"Button Clicked: {link.name}");
+            if (printLogs) OutLogger.Note($"Button Clicked: {link.name}");
 
             link.onClick?.Invoke();
 
@@ -312,7 +312,7 @@ namespace OutGame
                         bool success = OutGameManager.Instance?.ContinueGame() ?? false;
                         if (!success)
                         {
-                            OutLogger.LogError("Failed to continue game.");
+                            OutLogger.Error("Failed to continue game.");
                             link.onActionFailed?.Invoke();
                         }
                         break;
