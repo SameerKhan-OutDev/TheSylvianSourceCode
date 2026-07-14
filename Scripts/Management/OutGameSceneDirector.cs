@@ -144,7 +144,7 @@ namespace OutGame
             await ResumeGameplayWithTransitionAsync();
         }
 
-        private void ResumeSavedGame()
+        public void ResumeSavedGame()
         {
             SaveData data = null;
 
@@ -250,16 +250,12 @@ namespace OutGame
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
 
-            // Transition Time & Visuals back to normal
-            float transitionTime = Random.Range(0.2f, 0.5f);
-
+            // FIX: Snap timescale instantly to prevent input desyncs
             m_timeTween?.Kill();
-            m_timeTween = DOTween.To(() => Time.timeScale, x =>
-            {
-                Time.timeScale = x;
-                Time.fixedDeltaTime = 0.02f * x; // Adjust physics step to avoid stuttering
-            }, 1f, transitionTime).SetUpdate(true).SetEase(Ease.InOutSine);
+            Time.timeScale = 1f;
+            Time.fixedDeltaTime = 0.02f;
 
+            float transitionTime = Random.Range(0.2f, 0.5f);
             if (m_colorAdjustments != null)
             {
                 DOTween.To(() => m_colorAdjustments.saturation.value, x => m_colorAdjustments.saturation.value = x, 0f, transitionTime).SetUpdate(true);
@@ -282,16 +278,12 @@ namespace OutGame
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
 
-            // Transition Time to 0 and screen to Greyscale
-            float transitionTime = Random.Range(0.2f, 0.5f);
-
+            // FIX: Snap timescale instantly to 0 
             m_timeTween?.Kill();
-            m_timeTween = DOTween.To(() => Time.timeScale, x =>
-            {
-                Time.timeScale = x;
-                Time.fixedDeltaTime = 0.02f * x;
-            }, 0f, transitionTime).SetUpdate(true).SetEase(Ease.OutSine);
+            Time.timeScale = 0f;
+            Time.fixedDeltaTime = 0f;
 
+            float transitionTime = Random.Range(0.2f, 0.5f);
             if (m_colorAdjustments != null)
             {
                 DOTween.To(() => m_colorAdjustments.saturation.value, x => m_colorAdjustments.saturation.value = x, -100f, transitionTime).SetUpdate(true);

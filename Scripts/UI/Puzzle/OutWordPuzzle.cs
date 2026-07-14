@@ -319,15 +319,12 @@ namespace OutGame
 
         private void CheckSubmission()
         {
-            // THE UNCLE FIX: Build a string from the ENTIRE board.
-            // Empty ghost slots return ' ' so they act as proper spaces.
             string fullGridString = "";
             for (int i = 0; i < _gridState.Length; i++)
             {
                 fullGridString += _gridState[i].GetLetter();
             }
 
-            // If the target word exists literally anywhere in consecutive order
             if (fullGridString.Contains(_targetWord))
             {
                 OutSoundManager.Instance.PlayUISound(soundSuccess, true);
@@ -339,6 +336,14 @@ namespace OutGame
                 OutSoundManager.Instance.PlayUISound(soundFail, true);
                 OutLogger.Note("[WordPuzzle] Incorrect Word. Try again.");
                 puzzleCanvasGroup.transform.DOShakePosition(0.5f, 5f);
+
+                // ---> NEW DAMAGE LOGIC <---
+                PlayerHealth playerHealth = FindAnyObjectByType<PlayerHealth>();
+                if (playerHealth != null)
+                {
+                    // Reduces health by exactly 30% of max health
+                    playerHealth.TakeDamagePercentage(30f);
+                }
             }
         }
 

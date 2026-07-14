@@ -210,7 +210,22 @@ namespace OutGame
                     ActiveSaveFilePath = filePath;
                     OutSoundManager.Instance.StopMusic(false);
                     IsNewGameSession = false;
-                    StartLoadingScene(latestData.sceneName);
+
+                    // FIX: Check if we are already in the target scene
+                    if (SceneManager.GetActiveScene().name == latestData.sceneName)
+                    {
+                        // Reset player states and ISaveables directly without reloading the scene
+                        ChangeState(OutGameState.Gameplay);
+
+                        if (OutGameSceneDirector.Instance != null)
+                        {
+                            OutGameSceneDirector.Instance.ResumeSavedGame();
+                        }
+                    }
+                    else
+                    {
+                        StartLoadingScene(latestData.sceneName);
+                    }
                     return true;
                 }
                 else

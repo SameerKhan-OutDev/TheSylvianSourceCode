@@ -1,6 +1,4 @@
 using DG.Tweening;
-using OutGame;
-using System;
 using UnityEngine;
 
 namespace OutGame
@@ -13,6 +11,21 @@ namespace OutGame
         [Header("Core References")]
         [SerializeField] private GameObject mainMenuUI;
         [SerializeField] private GameplayUI gameplayUI;
+        [SerializeField] private OutPausePanel pausePanel;
+
+        private OutPausePanel PausePanel
+        {
+            get
+            {
+                if (pausePanel == null)
+                {
+                    pausePanel = FindAnyObjectByType<OutPausePanel>(FindObjectsInactive.Include);
+                    if (pausePanel == null)
+                        OutLogger.Error("OutUIManager: Pause panel reference is missing! Please assign it.");
+                }
+                return pausePanel;
+            }
+        }
 
         [Header("End Screens")]
         [SerializeField] private OutFailurePanel failurePanel;
@@ -37,11 +50,9 @@ namespace OutGame
         #region UnityLifecycle
         private void Awake()
         {
-            // Ensure only one instance exists
             if (Instance == null)
             {
                 Instance = this;
-                //DontDestroyOnLoad(gameObject);
                 InitializeUI();
             }
             else
@@ -63,6 +74,31 @@ namespace OutGame
                 OutGameManager.Instance.StateChanged -= OnGameStateChanged;
             OutGameManager.Instance.SceneLoadingStarted -= OnSceneLoadingStarted;
             OutGameManager.Instance.SceneLoadingCompleted -= OnSceneLoadingCompleted;
+        }
+
+        private void Update()
+        {
+            // Listen for the Cancel action exclusively through the UI map
+            if (OutInputManager.Instance != null && OutInputManager.Instance.InputActions.UI.Cancel.WasPressedThisFrame())
+            {
+                if (OutGameManager.Instance.currentState == OutGameState.Gameplay)
+                {
+                    OutGameManager.Instance.ChangeState(OutGameState.Paused);
+                    OutInputManager.Instance.SetGameplayInput(false);
+                }
+                else if (OutGameManager.Instance.currentState == OutGameState.Paused)
+                {
+                    if (PausePanel != null && PausePanel.gameObject.activeSelf)
+                    {
+                        PausePanel.OnResumeClicked();
+                    }
+                    else
+                    {
+                        OutGameManager.Instance.ChangeState(OutGameState.Gameplay);
+                        OutGameSceneDirector.Instance.StartGameplay();
+                    }
+                }
+            }
         }
         #endregion
 
@@ -98,68 +134,75 @@ namespace OutGame
             {
                 EnableGameplayUI();
 
-                // Find FailurePanel if it's not already assigned
-                if (FailurePanel != null)
-                    FailurePanel.gameObject.SetActive(false);
-                else
-                {
-                    failurePanel = FindAnyObjectByType<OutFailurePanel>(FindObjectsInactive.Include);
-                    if (failurePanel != null)
-                    {
-                        failurePanel.gameObject.SetActive(false);
-                    }
-                }
+                Time.timeScale = 1f;
+
+                OutInputManager.Instance.SetGameplayInput(true);
+
+                if (FailurePanel != null) FailurePanel.gameObject.SetActive(false);
+                if (PausePanel != null) PausePanel.gameObject.SetActive(false);
             }
             else if (newState == OutGameState.MainMenu)
             {
                 EnableMainMenu();
+                if (PausePanel != null) PausePanel.gameObject.SetActive(false);
+            }
+            else if (newState == OutGameState.Paused)
+            {
+                // Trigger the pause panel
+                if (PausePanel != null)
+                {
+                    string currentObjective = "NO ACTIVE OBJECTIVE";
+
+                    if (OutSaveController.Instance != null)
+                    {
+                        SaveData latestData = OutSaveController.Instance.GetLatestSaveData(out _);
+                        if (latestData != null && !string.IsNullOrEmpty(latestData.currentObjective))
+                        {
+                            currentObjective = latestData.currentObjective;
+                        }
+                    }
+
+                    pausePanel.gameObject.SetActive(true);
+
+                    PausePanel.ShowPanel("PAUSED", currentObjective);
+                }
             }
         }
 
         private void InitializeUI()
         {
-            // Set initial UI state
             EnableMainMenu();
         }
 
         public void EnableMainMenu()
         {
             mainMenuUI.SetActive(true);
-            if (gameplayUI != null)
-                gameplayUI.gameObject.SetActive(false);
+            if (gameplayUI != null) gameplayUI.gameObject.SetActive(false);
         }
 
         public void EnableGameplayUI()
         {
             mainMenuUI.SetActive(false);
 
-            // Find and enable the GameplayUI if it's not already assigned
             if (gameplayUI != null)
                 gameplayUI.gameObject.SetActive(true);
             else
             {
                 gameplayUI = FindAnyObjectByType<GameplayUI>();
-                if (gameplayUI != null)
-                {
-                    gameplayUI.gameObject.SetActive(true);
-                }
+                if (gameplayUI != null) gameplayUI.gameObject.SetActive(true);
             }
         }
 
         public void ShowGameplayHint(string message)
         {
             if (gameplayUI != null && gameplayUI.gameplayHintsPanel != null)
-            {
                 gameplayUI.gameplayHintsPanel.DisplayHint(message);
-            }
         }
 
         public void HideGameplayHint()
         {
             if (gameplayUI != null && gameplayUI.gameplayHintsPanel != null)
-            {
                 gameplayUI.gameplayHintsPanel.HideHint();
-            }
         }
 
         public void ShowFailurePanel(string reason)
@@ -168,11 +211,6 @@ namespace OutGame
             {
                 FailurePanel.gameObject.SetActive(true);
                 FailurePanel.ShowPanel(reason);
-            }
-            else
-            {
-
-                OutLogger.Error("OutUIManager: Failure panel reference is missing! Cannot display death screen.");
             }
         }
         #endregion

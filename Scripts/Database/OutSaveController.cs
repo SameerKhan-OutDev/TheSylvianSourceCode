@@ -4,40 +4,6 @@ using System.IO;
 using System.Linq;
 using UnityEngine;
 
-// 1. THE DATA CONTAINER
-// This class defines EXACTLY what gets written to the JSON file.
-// Add variables here to expand what you want to save in the future.
-[Serializable]
-public class SaveData
-{
-    [Header("Session Metadata")]
-    public string saveName;         // e.g., "Session_01"
-    public string lastPlayedTime;   // To show "Last played: 2 mins ago"
-    public string sceneName;        // To load the correct Unity Scene
-
-    [Header("Game Progression")]
-    public string currentMission;
-    public string currentObjective;
-
-    [Header("Character State")]
-    public Vector3 playerPosition;
-    public Quaternion playerRotation;
-
-    // Distinct location the character 'remembers' (Narrative Checkpoint)
-    public string rememberedLocationName;
-
-    public int saveSlotIndex;
-    public float completionPercentage;
-
-    [Header("World State Data")]
-    public List<string> completedSubObjectives = new List<string>();
-    public List<string> triggeredTrapIDs = new List<string>();
-    public List<string> deadEnemyIDs = new List<string>();
-
-    public List<string> unlockedTerminalIDs = new List<string>();
-}
-
-
 namespace OutGame
 {
     // 2. THE CONTROLLER

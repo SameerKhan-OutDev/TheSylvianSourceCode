@@ -60,6 +60,10 @@ namespace OutGame
         [SerializeField] private string _nameEngage = "Engage";
         [SerializeField] private string _nameDisorient = "Disorient";
 
+        [Header("Disorient Damage")]
+        [SerializeField] private float _disorientDamageRadius = 4f;
+        [SerializeField] private float _disorientDamagePercentage = 20f;
+
         [Header("Events")]
         public UnityEvent onDie;
         #endregion
@@ -253,6 +257,18 @@ namespace OutGame
             OutSoundManager.Instance?.PlaySFX(SoundType.ManDie, true, transform.position);
 
             if (TryGetComponent(out Collider col)) col.enabled = false;
+
+            // ---> NEW DAMAGE LOGIC <---
+            // Create a blast radius check
+            Collider[] hitColliders = Physics.OverlapSphere(transform.position, _disorientDamageRadius);
+            foreach (var hit in hitColliders)
+            {
+                // Check if the object hit has the player health component
+                if (hit.TryGetComponent(out IDamagable playerHealth))
+                {
+                    playerHealth.TakeDamagePercentage(_disorientDamagePercentage);
+                }
+            }
 
             _ = DisableAfterDeathAnimationAsync();
         }
@@ -499,6 +515,12 @@ namespace OutGame
             // Disable the core AI components
             _agent.enabled = false;
             this.enabled = false;
+        }
+
+        private void OnDrawGizmosSelected()
+        {
+            Gizmos.color = Color.red;
+            Gizmos.DrawWireSphere(transform.position, _disorientDamageRadius);
         }
         #endregion
     }

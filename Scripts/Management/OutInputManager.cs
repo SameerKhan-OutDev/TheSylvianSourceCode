@@ -88,6 +88,7 @@ public class OutInputManager : MonoBehaviour
         if (enabled)
         {
             inputActions.Player.Enable();
+            inputActions.UI.Disable();
             ToggleCursorState(false); // Hide cursor for gameplay
         }
         else

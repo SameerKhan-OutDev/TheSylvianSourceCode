@@ -16,7 +16,13 @@ namespace OutGame
         [Tooltip("The hint displayed if the player takes too long on THIS specific step.")]
         public string hintText;
 
+        [HideInInspector]
+        public bool isStarted = false;
+
         public bool isCompleted = false;
+
+        [Tooltip("Fired locally when this specific step becomes the active objective.")]
+        public UnityEvent onObjectiveStarted;
 
         [Tooltip("Fired locally when this specific step is completed.")]
         public UnityEvent onObjectiveCompleted;
@@ -103,8 +109,7 @@ namespace OutGame
                 if (data.completedSubObjectives.Contains(objective.objectiveID))
                 {
                     objective.isCompleted = true;
-                    // Note: Do NOT invoke the UnityEvent here, as it might trigger animations 
-                    // or sounds meant for active gameplay. Just set the state visually.
+                    objective.isStarted = true; // Ensure completed objectives don't fire their start events again
                 }
                 else
                 {
@@ -116,6 +121,11 @@ namespace OutGame
             {
                 m_isPuzzleSolved = true;
                 if (TryGetComponent(out BoxCollider col)) col.enabled = false;
+            }
+            else
+            {
+                // Trigger the start event for the current uncompleted objective
+                UpdateActiveObjective();
             }
         }
 
@@ -150,6 +160,7 @@ namespace OutGame
                 OutSoundManager.Instance?.PlayMusic(m_puzzleZoneSound, false);
 
                 SpawnNPCs();
+                UpdateActiveObjective(); // Ensure the active objective fires its start event when entering
                 _ = StartHintTimerAsync();
             }
         }
@@ -170,6 +181,27 @@ namespace OutGame
 
         #region Objective Management
         /// <summary>
+        /// Locates the first uncompleted objective in the sequence and fires its start event if it hasn't been triggered yet.
+        /// </summary>
+        private void UpdateActiveObjective()
+        {
+            if (m_isPuzzleSolved) return;
+
+            foreach (var obj in m_objectives)
+            {
+                if (!obj.isCompleted)
+                {
+                    if (!obj.isStarted)
+                    {
+                        obj.isStarted = true;
+                        obj.onObjectiveStarted?.Invoke();
+                    }
+                    break; // Stop at the first uncompleted objective (it is the active one)
+                }
+            }
+        }
+
+        /// <summary>
         /// Can be called via UnityEvents directly, or caught automatically via the static global event.
         /// </summary>
         public void CompleteSubObjective(string objectiveID)
@@ -180,11 +212,11 @@ namespace OutGame
             bool foundObjective = false;
 
             OutSaveController.Instance?.SaveGame(
-        "Current Mission", // You can pull this from a global narrative manager
-        "Current Objective",
-        OutGameSceneDirector.Instance.playerTransform,
-        gameObject.name // Or a specific narrative room name
-    );
+                "Current Mission", // You can pull this from a global narrative manager
+                "Current Objective",
+                OutGameSceneDirector.Instance.playerTransform,
+                gameObject.name // Or a specific narrative room name
+            );
 
             foreach (var objective in m_objectives)
             {
@@ -201,9 +233,10 @@ namespace OutGame
                 }
             }
 
-            // If we completed a step, restart the hint timer so it prepares the NEXT objective's hint
+            // If we completed a step, prep the next objective's events and hint timer
             if (foundObjective && !allCompleted)
             {
+                UpdateActiveObjective();
                 _ = StartHintTimerAsync();
             }
 
