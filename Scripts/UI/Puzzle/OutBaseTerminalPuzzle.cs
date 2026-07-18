@@ -12,20 +12,34 @@ namespace OutGame
         {
             puzzleCompletionSource = tcs;
         }
+        public virtual void OnEnable()
+        {
+            OutInputManager.Instance.SetGameplayInput(false);
+            OutPlayerHealthDispatcher.OnKillRequested += HandlePlayerDeath;
+        }
+
+        public virtual void OnDisable()
+        {
+            OutInputManager.Instance.SetGameplayInput(true);
+            OutPlayerHealthDispatcher.OnKillRequested -= HandlePlayerDeath;
+        }
+
+        private void HandlePlayerDeath(EDamageType deathReason)
+        {
+            ForceInstantShutdown();
+        }
+
+        /// <summary>
+        /// Instantly shuts down the puzzle UI without animations to clear the screen for death sequences.
+        /// </summary>
+        protected virtual void ForceInstantShutdown()
+        {
+            gameObject.SetActive(false);
+        }
 
         protected void CompletePuzzle(bool success)
         {
             puzzleCompletionSource?.TrySetResult(success);
-        }
-
-        public void OnEnable()
-        {
-            OutInputManager.Instance.SetGameplayInput(false);
-        }
-
-        public void OnDisable()
-        {
-            OutInputManager.Instance.SetGameplayInput(true);
         }
 
         public abstract void AnimateIn();

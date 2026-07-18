@@ -66,6 +66,8 @@ namespace OutGame
             OutGameManager.Instance.StateChanged += OnGameStateChanged;
             OutGameManager.Instance.SceneLoadingStarted += OnSceneLoadingStarted;
             OutGameManager.Instance.SceneLoadingCompleted += OnSceneLoadingCompleted;
+
+            OutGameManager.Instance.SylvianFailed += ShowFailurePanel;
         }
 
         private void OnDisable()
@@ -74,31 +76,8 @@ namespace OutGame
                 OutGameManager.Instance.StateChanged -= OnGameStateChanged;
             OutGameManager.Instance.SceneLoadingStarted -= OnSceneLoadingStarted;
             OutGameManager.Instance.SceneLoadingCompleted -= OnSceneLoadingCompleted;
-        }
 
-        private void Update()
-        {
-            // Listen for the Cancel action exclusively through the UI map
-            if (OutInputManager.Instance != null && OutInputManager.Instance.InputActions.UI.Cancel.WasPressedThisFrame())
-            {
-                if (OutGameManager.Instance.currentState == OutGameState.Gameplay)
-                {
-                    OutGameManager.Instance.ChangeState(OutGameState.Paused);
-                    OutInputManager.Instance.SetGameplayInput(false);
-                }
-                else if (OutGameManager.Instance.currentState == OutGameState.Paused)
-                {
-                    if (PausePanel != null && PausePanel.gameObject.activeSelf)
-                    {
-                        PausePanel.OnResumeClicked();
-                    }
-                    else
-                    {
-                        OutGameManager.Instance.ChangeState(OutGameState.Gameplay);
-                        OutGameSceneDirector.Instance.StartGameplay();
-                    }
-                }
-            }
+            OutGameManager.Instance.SylvianFailed -= ShowFailurePanel;
         }
         #endregion
 
@@ -133,11 +112,6 @@ namespace OutGame
             if (newState == OutGameState.Gameplay)
             {
                 EnableGameplayUI();
-
-                Time.timeScale = 1f;
-
-                OutInputManager.Instance.SetGameplayInput(true);
-
                 if (FailurePanel != null) FailurePanel.gameObject.SetActive(false);
                 if (PausePanel != null) PausePanel.gameObject.SetActive(false);
             }
@@ -148,11 +122,9 @@ namespace OutGame
             }
             else if (newState == OutGameState.Paused)
             {
-                // Trigger the pause panel
                 if (PausePanel != null)
                 {
                     string currentObjective = "NO ACTIVE OBJECTIVE";
-
                     if (OutSaveController.Instance != null)
                     {
                         SaveData latestData = OutSaveController.Instance.GetLatestSaveData(out _);
@@ -162,10 +134,18 @@ namespace OutGame
                         }
                     }
 
-                    pausePanel.gameObject.SetActive(true);
+                    PausePanel.gameObject.SetActive(true);
 
                     PausePanel.ShowPanel("PAUSED", currentObjective);
                 }
+            }
+            else if (newState == OutGameState.Result)
+            {
+                // Close the pause panel immediately just in case they died the exact frame they paused
+                if (PausePanel != null) PausePanel.gameObject.SetActive(false);
+
+                // Note: The FailurePanel is opened by the ShowFailurePanel() method 
+                // which triggers via the SylvianFailed event, so we don't need to open it here!
             }
         }
 

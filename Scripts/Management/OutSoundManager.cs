@@ -14,18 +14,23 @@ namespace OutGame
 
         [Header("Data References")]
         [SerializeField] private SoundData soundData;
+        [SerializeField] private UIPanelSettings uiPanelSettings; // The new ScriptableObject
 
         [Header("Audio Sources")]
         [SerializeField] private AudioSource musicSource1;
         [SerializeField] private AudioSource musicSource2;
         [SerializeField] private AudioSource uiSoundSource;
+        [SerializeField] private AudioSource pauseMusicSource; // Dedicated source for pause/fail themes
         [SerializeField] private List<AudioSource> sfxSources;
 
         [Header("Settings")]
-        [Tooltip("Time in seconds for sounds to fade in/out when snap is false.")]
-        [SerializeField] private float fadeDuration = 1.0f;
+        [Tooltip("Default time in seconds for sounds to fade in/out.")]
+        [SerializeField] private float defaultFadeDuration = 1.0f;
 
         private AudioSource _activeMusicSource;
+
+        // Memory for paused audio states
+        private Dictionary<AudioSource, float> _pausedSources = new Dictionary<AudioSource, float>();
         #endregion
 
         #region Lifecycle
@@ -46,12 +51,14 @@ namespace OutGame
         private void OnEnable()
         {
             SceneManager.sceneLoaded += OnSceneLoaded;
+
             OutMenuController.AButtonClicked += PlayOnClickSound;
         }
 
         private void OnDisable()
         {
             SceneManager.sceneLoaded -= OnSceneLoaded;
+
             OutMenuController.AButtonClicked -= PlayOnClickSound;
         }
 
@@ -61,7 +68,6 @@ namespace OutGame
             {
                 PlayMusic(SoundType.ThemeSong, snap: false);
             }
-
         }
         #endregion
 
@@ -72,7 +78,6 @@ namespace OutGame
             {
                 PlayMusic(SoundType.ThemeSong, snap: false);
             }
-
         }
         #endregion
 
@@ -92,32 +97,13 @@ namespace OutGame
             }
             else
             {
-                _ = FadeInAndPlay(uiSoundSource, clip);
+                _ = FadeVolumeAsync(uiSoundSource, 0f, 1f, defaultFadeDuration, clip);
             }
         }
 
-        /// <summary>
-        /// Finds an available SFX source and plays the clip.
-        /// </summary>
         public void PlaySFX(SoundType type, bool snap)
         {
-            AudioClip clip = soundData.GetClip(type);
-            if (clip == null) return;
-
-            AudioSource availableSource = GetAvailableSFXSource();
-
-            if (availableSource != null)
-            {
-                if (snap)
-                {
-                    availableSource.volume = 1f;
-                    availableSource.PlayOneShot(clip);
-                }
-                else
-                {
-                    _ = FadeInAndPlay(availableSource, clip);
-                }
-            }
+            InternalPlaySFX(type, snap, null);
         }
 
         public void PlaySFX(SoundType type, bool snap, Vector3 position)
@@ -135,29 +121,18 @@ namespace OutGame
 
             if (availableSource != null)
             {
-                // 1. Position and Spatial Blend Handling
-                if (position.HasValue)
-                {
-                    availableSource.transform.position = position.Value;
-                    availableSource.spatialBlend = 1.0f; // Force 3D sound
-                }
-                else
-                {
-                    availableSource.spatialBlend = 0.0f; // Force 2D sound
-                }
+                availableSource.spatialBlend = position.HasValue ? 1.0f : 0.0f;
+                if (position.HasValue) availableSource.transform.position = position.Value;
 
-                // 2. Playback Logic
                 if (snap)
                 {
                     availableSource.volume = 1f;
-                    // Note: PlayOneShot is great for 2D, but for 3D positioning 
-                    // during a fade, we use .Play() so the source 'owns' the clip.
                     availableSource.clip = clip;
                     availableSource.Play();
                 }
                 else
                 {
-                    _ = FadeInAndPlay(availableSource, clip);
+                    _ = FadeVolumeAsync(availableSource, 0f, 1f, defaultFadeDuration, clip);
                 }
             }
         }
@@ -191,19 +166,34 @@ namespace OutGame
             AudioClip clip = soundData.GetClip(type);
             if (clip == null) return;
 
+            // 1. Check all SFX sources
             foreach (var source in sfxSources)
             {
                 if (source.isPlaying && source.clip == clip)
                 {
-                    if (snap) source.Stop();
-                    else _ = FadeOutAndStop(source);
+                    if (snap)
+                        source.Stop();
+                    else
+                        _ = FadeVolumeAsync(source, source.volume, 0f, defaultFadeDuration, stopOnComplete: true);
                 }
             }
 
-            if (uiSoundSource.isPlaying && uiSoundSource.clip == clip)
+            // 2. Check UI sound source
+            if (uiSoundSource != null && uiSoundSource.isPlaying && uiSoundSource.clip == clip)
             {
-                if (snap) uiSoundSource.Stop();
-                else _ = FadeOutAndStop(uiSoundSource);
+                if (snap)
+                    uiSoundSource.Stop();
+                else
+                    _ = FadeVolumeAsync(uiSoundSource, uiSoundSource.volume, 0f, defaultFadeDuration, stopOnComplete: true);
+            }
+
+            // 3. Check the new Pause Music source
+            if (pauseMusicSource != null && pauseMusicSource.isPlaying && pauseMusicSource.clip == clip)
+            {
+                if (snap)
+                    pauseMusicSource.Stop();
+                else
+                    _ = FadeVolumeAsync(pauseMusicSource, pauseMusicSource.volume, 0f, defaultFadeDuration, stopOnComplete: true);
             }
         }
 
@@ -214,16 +204,105 @@ namespace OutGame
         {
             if (_activeMusicSource == null || !_activeMusicSource.isPlaying) return;
 
-            if (snap)
+            if (snap) _activeMusicSource.Stop();
+            else _ = FadeVolumeAsync(_activeMusicSource, _activeMusicSource.volume, 0f, defaultFadeDuration, stopOnComplete: true);
+        }
+        #endregion
+
+        #region Pause & Resume Audio Logic (Crossfading)
+
+        /// <summary>
+        /// Fades out all currently playing game audio, pauses them, and fades in the Pause Theme.
+        /// </summary>
+        public async void PauseGameplayAudio()
+        {
+            if (uiPanelSettings == null) return;
+
+            float fadeTime = uiPanelSettings.pauseCrossfadeDuration;
+            _pausedSources.Clear();
+
+            // Find EVERY audio source in the scene
+            AudioSource[] allSources = FindObjectsByType<AudioSource>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+
+            foreach (var source in allSources)
             {
-                _activeMusicSource.Stop();
+                // Never pause the UI sound source or our dedicated Pause music source
+                if (source == uiSoundSource || source == pauseMusicSource) continue;
+
+                if (source.isPlaying)
+                {
+                    _pausedSources.Add(source, source.volume);
+                    // Fade it to 0 without stopping it
+                    _ = FadeVolumeAsync(source, source.volume, 0f, fadeTime);
+                }
             }
-            else
+
+            // Wait for the fade out to finish
+            await Awaitable.WaitForSecondsAsync(fadeTime); // Uses scaled time, but audio fade below uses unscaled
+
+            // Physically pause them so they don't lose their place in the track
+            foreach (var kvp in _pausedSources)
             {
-                // Reuses your existing private Awaitable logic
-                _ = FadeOutAndStop(_activeMusicSource);
+                if (kvp.Key != null) kvp.Key.Pause();
+            }
+
+            // Play the Pause Theme
+            AudioClip pauseClip = soundData.GetClip(uiPanelSettings.pauseMenuTheme);
+            if (pauseClip != null)
+            {
+                pauseMusicSource.clip = pauseClip;
+                pauseMusicSource.loop = true;
+                _ = FadeVolumeAsync(pauseMusicSource, 0f, 1f, fadeTime, pauseClip);
             }
         }
+
+        public async void FailGameplayAudio()
+        {
+            if (uiPanelSettings == null) return;
+
+            float fadeTime = uiPanelSettings.failureCrossfadeDuration;
+
+            // Stop the active music
+            if (_activeMusicSource != null)
+                _ = FadeVolumeAsync(_activeMusicSource, _activeMusicSource.volume, 0f, fadeTime, stopOnComplete: true);
+
+            // Play the Failure Theme
+            AudioClip failClip = soundData.GetClip(uiPanelSettings.failureTheme);
+            if (failClip != null)
+            {
+                pauseMusicSource.clip = failClip;
+                pauseMusicSource.loop = false; // Usually don't loop fail sounds
+                _ = FadeVolumeAsync(pauseMusicSource, 0f, 1f, fadeTime, failClip);
+            }
+        }
+
+        /// <summary>
+        /// Fades out the Pause Theme, unpauses all previously playing game audio, and fades them back to their original volumes.
+        /// </summary>
+        public void ResumeGameplayAudio()
+        {
+            if (uiPanelSettings == null) return;
+            float fadeTime = uiPanelSettings.pauseCrossfadeDuration;
+
+            // Fade out and stop the pause menu theme
+            _ = FadeVolumeAsync(pauseMusicSource, pauseMusicSource.volume, 0f, fadeTime, stopOnComplete: true);
+
+            // Unpause and fade in all saved sources
+            foreach (var kvp in _pausedSources)
+            {
+                AudioSource source = kvp.Key;
+                float originalVolume = kvp.Value;
+
+                if (source != null)
+                {
+                    source.UnPause();
+                    _ = FadeVolumeAsync(source, 0f, originalVolume, fadeTime);
+                }
+            }
+
+            _pausedSources.Clear();
+        }
+
         #endregion
 
         #region Helpers & Fading logic
@@ -242,44 +321,47 @@ namespace OutGame
             PlayUISound(SoundType.ButtonClick, snap: true);
         }
 
-        private async Awaitable FadeInAndPlay(AudioSource source, AudioClip clip)
+        /// <summary>
+        /// Universal fader using unscaledDeltaTime (Works while Time.timeScale = 0).
+        /// </summary>
+        private async Awaitable FadeVolumeAsync(AudioSource source, float startVol, float endVol, float duration, AudioClip clipToPlay = null, bool stopOnComplete = false)
         {
-            source.clip = clip;
-            source.volume = 0;
-            source.Play();
+            if (source == null) return;
 
-            float currentTime = 0;
-            while (currentTime < fadeDuration)
+            if (clipToPlay != null)
             {
-                currentTime += Time.deltaTime;
-                source.volume = Mathf.Lerp(0, 1, currentTime / fadeDuration);
-                await Awaitable.NextFrameAsync();
-            }
-            source.volume = 1f;
-        }
-
-        private async Awaitable FadeOutAndStop(AudioSource source)
-        {
-            float startVolume = source.volume;
-            float currentTime = 0;
-
-            while (currentTime < fadeDuration)
-            {
-                currentTime += Time.deltaTime;
-                source.volume = Mathf.Lerp(startVolume, 0, currentTime / fadeDuration);
-                await Awaitable.NextFrameAsync();
+                source.clip = clipToPlay;
+                source.Play();
             }
 
-            source.Stop();
-            source.volume = startVolume;
+            source.volume = startVol;
+            float currentTime = 0;
+
+            while (currentTime < duration)
+            {
+                if (source == null) break;
+
+                // CRITICAL: UnscaledDeltaTime allows the fade to happen even when the game is paused
+                currentTime += Time.unscaledDeltaTime;
+                source.volume = Mathf.Lerp(startVol, endVol, currentTime / duration);
+
+                await Awaitable.NextFrameAsync();
+            }
+
+            if (source != null)
+            {
+                source.volume = endVol;
+                if (stopOnComplete) source.Stop();
+            }
         }
 
         private async Awaitable FadeOutAndInMusic(AudioClip newClip)
         {
-            // Simple fade out current music, then fade in new music
-            await FadeOutAndStop(_activeMusicSource);
+            await FadeVolumeAsync(_activeMusicSource, _activeMusicSource.volume, 0f, defaultFadeDuration, stopOnComplete: true);
+
             _activeMusicSource.clip = newClip;
-            await FadeInAndPlay(_activeMusicSource, newClip);
+
+            await FadeVolumeAsync(_activeMusicSource, 0f, 1f, defaultFadeDuration, newClip);
         }
         #endregion
     }

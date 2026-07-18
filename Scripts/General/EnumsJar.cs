@@ -8,6 +8,16 @@ namespace OutGame
     public class EnumsJar : MonoBehaviour
     {
     }
+
+    public enum EDamageType
+    {
+        Generic,
+        PuzzleFailure,
+        AfflictedBlast,
+        Electrocution,
+        Hazard
+    }
+
     public enum DoorType
     {
         Horizontal,
@@ -67,6 +77,17 @@ namespace OutGame
         Clicked
     }
 
+    public enum EAfflictedCurrentState
+    {
+        Default,
+        Commanded_Stop,
+        Patrolling,
+        Commanded_TargetingFlee, // NEW: Waiting for player to select a location
+        Commanded_Flee,
+        Commanded_Engage,
+        Dead
+    }
+
     public enum OutLocomotionState
     {
         Walk,
@@ -94,7 +115,8 @@ namespace OutGame
         Loading = 2,
         Gameplay = 3,
         Paused = 4,
-        Cinematic = 5
+        Cinematic = 5,
+        Result = 6,
     }
 
     public enum MovementState { Idle, Walking, Sprinting, Automated }

@@ -76,6 +76,9 @@ public enum SoundType
     PuzzleZoneMusic3,
     PuzzleZoneMusic4_Loud,
     PuzzleZoneMusic5_Loud2,
+
+    pauseMenuTheme1, pauseMenuTheme2, pauseMenuTheme3,
+
 }
 
 [Serializable]

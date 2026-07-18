@@ -34,6 +34,10 @@ namespace OutGame
         public string spawnID; // Give each spawn point a unique ID
         public GameObject npcPrefab;
         public Transform spawnPoint;
+
+        [Space]
+        [Tooltip("[Optional] List of destinations the NPC can move to.")]
+        public List<Transform> destinations;
     }
 
     /// <summary>
@@ -279,6 +283,21 @@ namespace OutGame
                 if (spawnData.npcPrefab != null && spawnData.spawnPoint != null)
                 {
                     GameObject newNPC = Instantiate(spawnData.npcPrefab, spawnData.spawnPoint.position, spawnData.spawnPoint.rotation);
+
+                    // Decoupled Interface Check: Assign destinations if the object supports it
+                    if (newNPC.TryGetComponent(out INonPlayableCharacter npcInterface))
+                    {
+                        if (spawnData.destinations != null && spawnData.destinations.Count > 0)
+                        {
+                            npcInterface.followDestinations = true;
+                            npcInterface.FollowDestinations(spawnData.destinations);
+                        }
+                        else
+                        {
+                            npcInterface.followDestinations = false;
+                        }
+                    }
+
                     m_spawnedNPCs.Add(newNPC);
                 }
             }

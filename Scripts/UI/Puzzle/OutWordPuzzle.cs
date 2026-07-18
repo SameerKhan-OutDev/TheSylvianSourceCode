@@ -337,13 +337,8 @@ namespace OutGame
                 OutLogger.Note("[WordPuzzle] Incorrect Word. Try again.");
                 puzzleCanvasGroup.transform.DOShakePosition(0.5f, 5f);
 
-                // ---> NEW DAMAGE LOGIC <---
-                PlayerHealth playerHealth = FindAnyObjectByType<PlayerHealth>();
-                if (playerHealth != null)
-                {
-                    // Reduces health by exactly 30% of max health
-                    playerHealth.TakeDamagePercentage(30f);
-                }
+                // Completely decoupled global request
+                OutPlayerHealthDispatcher.RequestDamage(30f, EDamageType.PuzzleFailure);
             }
         }
 
@@ -379,6 +374,30 @@ namespace OutGame
             OutSoundManager.Instance.PlayUISound(soundCancel, true);
             OutLogger.Note("Puzzle Cancelled by User.");
             CompletePuzzle(false);
+        }
+
+        protected override void ForceInstantShutdown()
+        {
+            // Kill any active tweens to prevent DOTween errors when the object vanishes
+            puzzleCanvasGroup?.DOKill();
+            puzzleCanvasGroup?.transform.DOKill();
+
+            if (_allSlots != null)
+            {
+                foreach (var slot in _allSlots)
+                {
+                    if (slot != null)
+                    {
+                        slot.transform.DOKill();
+                        slot.GetComponent<CanvasGroup>()?.DOKill();
+                    }
+                }
+            }
+
+            highlightCursor?.DOKill();
+
+            // Fire the base logic to instantly disable the GameObject
+            base.ForceInstantShutdown();
         }
     }
 }

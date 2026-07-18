@@ -169,7 +169,7 @@ namespace OutGame
             if (OutGameManager.Instance != null)
             {
                 gameObject.SetActive(false);
-                OutGameManager.Instance.ContinueGame();
+                OutGameManager.Instance.ContinueGame(true);
             }
         }
 

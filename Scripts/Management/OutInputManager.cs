@@ -10,6 +10,8 @@ public class OutInputManager : MonoBehaviour
     private static GameObject _holder;
     private InputSystem_Actions inputActions;
 
+    public event System.Action OnPauseButtonPressed;
+
     [SerializeField] bool initializeWithGameplayInput = false;
 
     public InputSystem_Actions InputActions => inputActions;
@@ -57,6 +59,12 @@ public class OutInputManager : MonoBehaviour
         InputSystem.settings.updateMode = InputSettings.UpdateMode.ProcessEventsInDynamicUpdate;
         inputActions = new InputSystem_Actions();
         inputActions.Enable();
+
+        // Subscribe to the Player's pause button (Assuming you have one called 'Pause')
+        inputActions.Player.Pause.performed += ctx => OnPauseButtonPressed?.Invoke();
+
+        // Also subscribe to UI Cancel so you can unpause from the menu
+        inputActions.UI.Cancel.performed += ctx => OnPauseButtonPressed?.Invoke();
 
         SetGameplayInput(initializeWithGameplayInput);
     }

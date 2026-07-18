@@ -34,7 +34,7 @@ namespace OutGame
         }
 
         /// <summary>
-        /// Collects data and writes it to the JSON file.
+        /// Collects data and writes it to the JSON file based on the active save slot.
         /// </summary>
         /// <param name="mission">Current active mission ID or Name</param>
         /// <param name="objective">Current active objective text</param>
@@ -42,11 +42,19 @@ namespace OutGame
         /// <param name="locationMemory">The narrative name of the current location (e.g., "The Red Hallway")</param>
         public void SaveGame(string mission, string objective, Transform playerParams, string locationMemory)
         {
+            // Fetch the active slot from the GameManager
+            int activeSlot = 0;
+            if (OutGameManager.Instance != null)
+            {
+                activeSlot = OutGameManager.Instance.CurrentSaveSlot;
+            }
+
             // A. Prepare the Data
             SaveData data = new SaveData
             {
                 // Metadata
-                saveName = "AutoSave",
+                saveName = $"Save Slot {activeSlot + 1}", // Give it a dynamic name based on the slot
+                saveSlotIndex = activeSlot, // Make sure the data object knows its own slot
                 lastPlayedTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
                 sceneName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name,
 
@@ -67,7 +75,6 @@ namespace OutGame
             }
 
             // B. Serialize to JSON
-            // prettyPrint = true makes the file human-readable in Notepad
             string json = JsonUtility.ToJson(data, true);
 
             // C. Write to File
@@ -81,8 +88,15 @@ namespace OutGame
                     Directory.CreateDirectory(fullPath);
                 }
 
-                string filePath = Path.Combine(fullPath, defaultFileName);
+                // FIX: Write to the specific slot file path instead of the default hardcoded string!
+                string filePath = GetFilePathForSlot(activeSlot);
                 File.WriteAllText(filePath, json);
+
+                // Keep the GameManager's active path updated so the game knows exactly where we just saved
+                if (OutGameManager.Instance != null)
+                {
+                    OutGameManager.Instance.ActiveSaveFilePath = filePath;
+                }
 
                 OutLogger.Note($"<color=green>[OutSaveController]</color> Game saved successfully at: {filePath}");
             }

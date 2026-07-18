@@ -78,6 +78,19 @@ namespace OutGame
             }
         }
 
+        private void OnEnable()
+        {
+            // Wait for next frame to ensure InputManager is initialized, or subscribe in Start
+            if (OutInputManager.Instance != null)
+                OutInputManager.Instance.OnPauseButtonPressed += TogglePause;
+        }
+
+        private void OnDisable()
+        {
+            if (OutInputManager.Instance != null)
+                OutInputManager.Instance.OnPauseButtonPressed -= TogglePause;
+        }
+
         private async void InitializeSystems()
         {
             OutLogger.Note("<color=cyan>[OutGameManager]</color> Initializing Systems...");
@@ -99,20 +112,41 @@ namespace OutGame
             if (currentState == newState) return;
 
             currentState = newState;
-            StateChanged?.Invoke(currentState); // Notify listeners
-
             OutLogger.Note($"State Changed to {currentState}");
 
+            // Handle core game logic here, NOT in the UI panels!
             switch (currentState)
             {
                 case OutGameState.MainMenu:
                     Time.timeScale = 1f;
                     break;
                 case OutGameState.Gameplay:
+                    Time.timeScale = 1f;
+                    OutInputManager.Instance.SetGameplayInput(true); // Re-enable player controls
+                    OutSoundManager.Instance.ResumeGameplayAudio();
                     break;
                 case OutGameState.Paused:
+                    Time.timeScale = 0f;
+                    OutInputManager.Instance.SetGameplayInput(false); // Enable UI controls
+                    OutSoundManager.Instance.PauseGameplayAudio();
+                    break;
+                case OutGameState.Result: // <-- NEW BLOCK
+                    Time.timeScale = 0f;
+                    OutInputManager.Instance.SetGameplayInput(false);
+                    // We do NOT open the pause menu here. The SylvianFailed event handles the UI.
                     break;
             }
+
+            // Notify listeners (UIManager, SoundManager, etc.)
+            StateChanged?.Invoke(currentState);
+        }
+
+        private void TogglePause()
+        {
+            if (currentState == OutGameState.Gameplay)
+                ChangeState(OutGameState.Paused);
+            else if (currentState == OutGameState.Paused)
+                ChangeState(OutGameState.Gameplay);
         }
 
         public void StartLoadingScene(string sceneName)
@@ -188,7 +222,8 @@ namespace OutGame
             StartLoadingScene(firstMissionScene);
         }
 
-        public bool ContinueGame()
+        // Update the method signature to include the optional parameter
+        public bool ContinueGame(bool forceSceneReload = false)
         {
             OutLogger.Note("[OutGameManager] Attempting to Continue from the latest save...");
 
@@ -200,7 +235,6 @@ namespace OutGame
 
             try
             {
-                // If it crashes, the try-catch will catch it here
                 SaveData latestData = OutSaveController.Instance.GetLatestSaveData(out string filePath);
 
                 if (latestData != null && !string.IsNullOrEmpty(latestData.sceneName))
@@ -211,8 +245,8 @@ namespace OutGame
                     OutSoundManager.Instance.StopMusic(false);
                     IsNewGameSession = false;
 
-                    // FIX: Check if we are already in the target scene
-                    if (SceneManager.GetActiveScene().name == latestData.sceneName)
+                    // FIX: Check if we are already in the target scene AND we aren't forcing a reload
+                    if (!forceSceneReload && SceneManager.GetActiveScene().name == latestData.sceneName)
                     {
                         // Reset player states and ISaveables directly without reloading the scene
                         ChangeState(OutGameState.Gameplay);
@@ -236,9 +270,8 @@ namespace OutGame
             }
             catch (System.Exception ex)
             {
-                // THIS will catch the silent killer and tell us exactly what it is!
                 OutLogger.Error($"[OutGameManager] FATAL CRASH during ContinueGame: {ex.Message}\n{ex.StackTrace}");
-                return false; // Still return false so your UI Panel opens!
+                return false;
             }
         }
 
@@ -246,10 +279,10 @@ namespace OutGame
         {
             OutLogger.Note($"<color=red>[OutGameManager]</color> Sylvian Failed! Reason: {failureReason}");
 
-            // Optional: Change game state to freeze background elements or pause
-            ChangeState(OutGameState.Paused);
+            // Change to the new Failed state instead of Paused
+            ChangeState(OutGameState.Result);
 
-            // Broadcast the failure to any listeners (like a Game Over UI Panel)
+            // Broadcast the failure to any listeners (like your Failure Panel)
             SylvianFailed?.Invoke(failureReason);
         }
 

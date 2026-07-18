@@ -3,53 +3,73 @@ using UnityEngine;
 namespace OutGame
 {
     /// <summary>
-    /// Manages Sylvian's health, damage intake, and death state.
+    /// Core system managing health logic, listening to global requests, and driving UI state.
     /// </summary>
     public class PlayerHealth : MonoBehaviour, IDamagable
     {
+        #region Inspector Fields
         [Header("Health Settings")]
         [SerializeField] private float maxHealth = 100f;
+        #endregion
+
+        #region Internal State
         private float currentHealth;
-
         private IHealthUI healthUI;
+        private bool isDead;
+        #endregion
 
-        private void Start()
+        #region Unity Lifecycle
+        private void Awake()
         {
             currentHealth = maxHealth;
-            // Grabs the UI component automatically
-            healthUI = FindAnyObjectByType<SylvianHealthUI>();
         }
 
-        /// <summary>
-        /// Reduces health by a specific percentage of the max health.
-        /// </summary>
-        public void TakeDamagePercentage(float percentage)
+        private void OnEnable()
         {
-            float damageAmount = maxHealth * (percentage / 100f);
-            TakeDamage(damageAmount);
+            OutPlayerHealthDispatcher.OnDamageRequested += HandleGlobalDamageRequest;
+            OutPlayerHealthDispatcher.OnKillRequested += HandleGlobalKillRequest;
         }
 
-        public void TakeDamage(float amount)
+        private void OnDisable()
         {
-            currentHealth -= amount;
+            OutPlayerHealthDispatcher.OnDamageRequested -= HandleGlobalDamageRequest;
+            OutPlayerHealthDispatcher.OnKillRequested -= HandleGlobalKillRequest;
+        }
+        #endregion
+
+        #region Core Execution Pipeline
+        private void HandleGlobalDamageRequest(float rawAmount, EDamageType type)
+        {
+            if (isDead) return;
+
+            currentHealth -= rawAmount;
             currentHealth = Mathf.Max(0, currentHealth);
 
-            // Pass the normalized health value (0.0 to 1.0) to the UI
+            if (healthUI == null)
+            {
+                healthUI = FindAnyObjectByType<SylvianHealthUI>(FindObjectsInactive.Include);
+            }
+
             healthUI?.ReduceHealth(currentHealth / maxHealth);
 
             if (currentHealth <= 0)
             {
-                Die();
+                HandleGlobalKillRequest(type);
             }
         }
 
-        private void Die()
+        private void HandleGlobalKillRequest(EDamageType type)
         {
-            if (OutGameManager.Instance != null)
-            {
-                // Triggers the exact failure flow you already established
-                OutGameManager.Instance.TriggerSylvianFailed("SYLVIAN KILLED IN ACTION");
-            }
+            if (isDead) return;
+            isDead = true;
+
+            // Forward the specialized execution type directly to the conductor listening on the same/sub-systems
+            OutPlayerHealthDispatcher.RequestKill(type);
         }
+
+        // Keep explicit interface support intact for manual direct tracing if needed
+        public void TakeDamage(float amount) => HandleGlobalDamageRequest(amount, EDamageType.Generic);
+        public void TakeDamagePercentage(float percentage) => HandleGlobalDamageRequest(maxHealth * (percentage / 100f), EDamageType.Generic);
+        #endregion
     }
 }

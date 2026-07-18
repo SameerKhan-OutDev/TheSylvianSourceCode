@@ -17,19 +17,11 @@ namespace OutGame
         Aggressive
     }
 
-    public enum EAfflictedCurrentState
-    {
-        Default,
-        Commanded_Stop,
-        Commanded_TargetingFlee, // NEW: Waiting for player to select a location
-        Commanded_Flee,
-        Commanded_Engage,
-        Dead
-    }
+
 
     [RequireComponent(typeof(NavMeshAgent))]
     [RequireComponent(typeof(Animator))]
-    public class OutAfflictedAI : MonoBehaviour, IOutInteractable, IOutConductor // ADDED IOutConductor
+    public class OutAfflictedAI : MonoBehaviour, IOutInteractable, IOutConductor, INonPlayableCharacter
     {
         #region Inspector Fields
         [Header("Afflicted Configuration")]
@@ -62,7 +54,7 @@ namespace OutGame
 
         [Header("Disorient Damage")]
         [SerializeField] private float _disorientDamageRadius = 4f;
-        [SerializeField] private float _disorientDamagePercentage = 20f;
+        [SerializeField] private float _disorientDamagePercentage = 60f;
 
         [Header("Events")]
         public UnityEvent onDie;
@@ -216,6 +208,40 @@ namespace OutGame
         }
         #endregion
 
+        #region INonPlayableCharacter Implementation
+        public List<Transform> Destinations { get; set; } = new List<Transform>();
+        public bool followDestinations { get; set; } = false;
+
+        [Header("Patrol Settings")]
+        [SerializeField] private float _waitTimeAtDestination = 2f;
+        [SerializeField] private float _destinationTolerance = 0.5f;
+
+        private int _currentPatrolIndex = 0;
+        private float _patrolWaitTimer = 0f;
+
+        public void FollowDestinations(List<Transform> destinations)
+        {
+            if (destinations == null || destinations.Count == 0)
+            {
+                followDestinations = false;
+                Destinations.Clear();
+                _currentState = EAfflictedCurrentState.Default;
+                return;
+            }
+
+            Destinations = destinations;
+            followDestinations = true;
+            _currentPatrolIndex = 0;
+            _patrolWaitTimer = 0f;
+
+            // Switch state and assign the first target
+            _currentState = EAfflictedCurrentState.Patrolling;
+            _agent.isStopped = false;
+            _agent.speed = _walkSpeed;
+            _agent.SetDestination(Destinations[_currentPatrolIndex].position);
+        }
+        #endregion
+
         #region Root Node Commands
 
         public void CommandStop()
@@ -258,15 +284,13 @@ namespace OutGame
 
             if (TryGetComponent(out Collider col)) col.enabled = false;
 
-            // ---> NEW DAMAGE LOGIC <---
-            // Create a blast radius check
             Collider[] hitColliders = Physics.OverlapSphere(transform.position, _disorientDamageRadius);
             foreach (var hit in hitColliders)
             {
-                // Check if the object hit has the player health component
-                if (hit.TryGetComponent(out IDamagable playerHealth))
+                if (hit.GetComponentInParent<OutPlayerConductor>() != null)
                 {
-                    playerHealth.TakeDamagePercentage(_disorientDamagePercentage);
+                    OutPlayerHealthDispatcher.RequestDamage(_disorientDamagePercentage, EDamageType.AfflictedBlast);
+                    break;
                 }
             }
 
@@ -316,6 +340,25 @@ namespace OutGame
         {
             switch (_currentState)
             {
+                case EAfflictedCurrentState.Patrolling:
+                    if (followDestinations && Destinations.Count > 0)
+                    {
+                        // Check if the agent has reached its current destination
+                        if (!_agent.pathPending && _agent.remainingDistance <= _destinationTolerance)
+                        {
+                            _patrolWaitTimer += Time.deltaTime;
+
+                            // Wait at the destination before moving to the next one
+                            if (_patrolWaitTimer >= _waitTimeAtDestination)
+                            {
+                                _currentPatrolIndex = (_currentPatrolIndex + 1) % Destinations.Count;
+                                _agent.SetDestination(Destinations[_currentPatrolIndex].position);
+                                _patrolWaitTimer = 0f;
+                            }
+                        }
+                    }
+                    break;
+
                 case EAfflictedCurrentState.Commanded_Flee:
                     // Handled automatically by NavMeshAgent
                     break;

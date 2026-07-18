@@ -50,9 +50,13 @@ namespace OutGame
         private bool m_isAiming;
 
         // Highlighting
+        [Header("Highlight Settings")]
+        [Tooltip("A single global material utilizing an Outline/Inverted Hull shader.")]
+        [SerializeField] private Material m_globalOutlineMaterial;
         private List<Renderer> m_currentRenderers;
         private MaterialPropertyBlock m_propBlock;
         private static readonly int EmissiveColorId = Shader.PropertyToID("_EmissiveColor");
+        private static readonly int OutlineColorId = Shader.PropertyToID("_OutlineColor");
         #endregion
 
         #region Unity Messages
@@ -270,25 +274,57 @@ namespace OutGame
 
         private void ApplyHighlight(Color a_color)
         {
-            if (m_currentRenderers == null) return;
+            if (m_currentRenderers == null || m_globalOutlineMaterial == null) return;
+
             for (int i = 0; i < m_currentRenderers.Count; i++)
             {
-                if (m_currentRenderers[i] == null) continue;
-                m_currentRenderers[i].GetPropertyBlock(m_propBlock);
-                m_propBlock.SetColor(EmissiveColorId, a_color);
-                m_currentRenderers[i].SetPropertyBlock(m_propBlock);
+                Renderer r = m_currentRenderers[i];
+                if (r == null) continue;
+
+                Material[] currentMats = r.sharedMaterials;
+
+                // 1. Inject the outline material if it isn't already there
+                if (currentMats.Length == 0 || currentMats[currentMats.Length - 1] != m_globalOutlineMaterial)
+                {
+                    Material[] newMats = new Material[currentMats.Length + 1];
+                    Array.Copy(currentMats, newMats, currentMats.Length);
+                    newMats[newMats.Length - 1] = m_globalOutlineMaterial;
+                    r.sharedMaterials = newMats;
+                }
+
+                // 2. Push the specific color to the property block
+                r.GetPropertyBlock(m_propBlock);
+                m_propBlock.SetColor(OutlineColorId, a_color);
+                r.SetPropertyBlock(m_propBlock);
             }
         }
 
         private void ClearHighlight()
         {
-            if (m_currentRenderers == null) return;
+            if (m_currentRenderers == null || m_globalOutlineMaterial == null) return;
+
             for (int i = 0; i < m_currentRenderers.Count; ++i)
             {
-                if (m_currentRenderers[i] == null) continue;
-                m_currentRenderers[i].GetPropertyBlock(m_propBlock);
-                m_propBlock.SetColor(EmissiveColorId, Color.black);
-                m_currentRenderers[i].SetPropertyBlock(m_propBlock);
+                Renderer r = m_currentRenderers[i];
+                if (r == null) continue;
+
+                Material[] currentMats = r.sharedMaterials;
+
+                // 1. Strip the outline material off the end of the array
+                if (currentMats.Length > 0 && currentMats[currentMats.Length - 1] == m_globalOutlineMaterial)
+                {
+                    Material[] newMats = new Material[currentMats.Length - 1];
+                    Array.Copy(currentMats, newMats, currentMats.Length - 1);
+                    r.sharedMaterials = newMats;
+                }
+
+                // 2. Clear the property block to avoid memory leaks or lingering colors
+                if (r.HasPropertyBlock())
+                {
+                    r.GetPropertyBlock(m_propBlock);
+                    m_propBlock.Clear();
+                    r.SetPropertyBlock(m_propBlock);
+                }
             }
         }
         #endregion

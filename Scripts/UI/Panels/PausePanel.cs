@@ -92,25 +92,11 @@ namespace OutGame
             gameObject.SetActive(true);
             ResetUIStates();
 
-            // 1. Freeze Time
-            Time.timeScale = 0f;
-
-            // 2. Set Text
             if (m_pauseTitleText != null)
                 m_pauseTitleText.text = string.IsNullOrEmpty(title) ? "PAUSED" : title.ToUpper();
 
             if (m_currentObjectiveText != null)
                 m_currentObjectiveText.text = string.IsNullOrEmpty(currentObjective) ? "NO ACTIVE OBJECTIVE" : currentObjective.ToUpper();
-
-            // 3. Audio Handling
-            MuteGameplayAudio();
-
-            if (OutSoundManager.Instance != null)
-            {
-                // Plays UI Pause Sound and fades in the Pause Menu Theme
-                OutSoundManager.Instance.PlayUISound(SoundType.PauseGame, true);
-                OutSoundManager.Instance.PlayMusic(m_pauseMenuTheme, false);
-            }
 
             await AnimateInAsync();
         }
@@ -197,18 +183,8 @@ namespace OutGame
         #region Callbacks
         public void OnResumeClicked()
         {
-            if (OutSoundManager.Instance != null)
-            {
-                OutSoundManager.Instance.PlayUISound(SoundType.ResumeGame, true);
-                OutSoundManager.Instance.StopMusic(false); // Fades out the pause theme
-            }
-
-            Time.timeScale = 1f;
-            RestoreGameplayAudio();
-
-            gameObject.SetActive(false);
-
-            // Return to normal gameplay state
+            // Just tell the Game Manager to go back to Gameplay. 
+            // The Game Manager will handle Time.timeScale and input mapping.
             if (OutGameManager.Instance != null)
                 OutGameManager.Instance.ChangeState(OutGameState.Gameplay);
         }
